@@ -149,5 +149,4 @@ firmware.*.bin
 firmware.uf2
 firmware.*.uf2
 tmp
-main.py
 src/MANIFEST

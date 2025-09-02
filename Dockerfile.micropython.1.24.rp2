@@ -3,13 +3,13 @@ FROM --platform=linux/x86_64 python:3.11
 ARG MICROPYTHON_VERSION=v1.24.1
 ARG MICROPYTHON_FILE_PATH=1.24
 ARG BOARD=RPI_PICO_W
+ARG HOSTNAME=bilalcast
 
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y cmake build-essential libffi-dev git pkg-config gcc-arm-none-eabi -y
 
 WORKDIR /opt/app
-
 ENV PATH=${PATH}:/root/.local/bin
 
 RUN git clone https://github.com/micropython/micropython && \
@@ -27,27 +27,52 @@ RUN git clone https://github.com/micropython/micropython && \
     'urllib3<2' \
     'pygdbmi<=0.9.0.2' \
     'kconfiglib==13.7.1' \
-    'bitstring>=3.1.6,<4' \
-    'construct==2.10.54' && \
-    mkdir -p /tmp/mdns-build
+    'bitstring>=3.1.6,<4' && \
+    pip install freezefs==2.4 
 
 WORKDIR /opt/app/micropython
 
+# Keep your mDNS tweaks
 RUN sed -i -E 's/define LWIP_MDNS_RESPONDER([ ]+)1/define LWIP_MDNS_RESPONDER\10/g' ports/rp2/lwip_inc/lwipopts.h
+RUN sed -i -E 's/define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT([ ]+)"[^"]+"/define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT\1"'"${HOSTNAME}"'"/g' ports/rp2/boards/RPI_PICO_W/mpconfigboard.h
 
 ENV BOARD=${BOARD}
 ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
 
 RUN make -C mpy-cross
-
 RUN git submodule update --init -- lib/pico-sdk lib/tinyusb
 
 WORKDIR /opt/app/micropython/ports/rp2
 
-ADD src/mdns_client modules/mdns_client
+# --- Freeze your code --------------------------------------------------------
+# Copy your bilalcast package (contains /src/bilalcast/main.py etc.)
+ADD src/bilalcast modules/bilalcast       
+
+# Create a tiny frozen main.py that runs your bilalcast.main on boot
+RUN printf '%s\n' \
+"try:" \
+"    import www_fs" \
+"except Exception:" \
+"    pass" \
+"try:" \
+"    from bilalcast.main import main as _main" \
+"    _main()" \
+"except Exception:" \
+"    import bilalcast.main  # noqa: F401" \
+> modules/main.py                           
+
+# --- (Optional) Freeze your web assets as a compressed VFS -------------------
+# If your HTML/CSS/JS/images live at src/www, pack them into /www (read-only)
+# If they live at src/bilalcast/www instead, change the first ADD to that path.
+ADD src/www /opt/app/www                  
+RUN python -m freezefs /opt/app/www /opt/app/www_fs.py \
+    --on-import=mount --target /www --compress || true   ### NEW (safe if folder absent)
+RUN [ -f /opt/app/www_fs.py ] && cp /opt/app/www_fs.py modules/www_fs.py || true  ### NEW
+
+# Your existing mdns client modules
+ADD src/mdns_client modules/mdns_client   
 
 ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
 
 ENTRYPOINT [ "bash" ]
-
-CMD ["-c", "make clean && make submodules && make -j16 && cp build-${BOARD}/firmware.uf2 /tmp/mdns-build/firmware.mp.${MICROPYTHON_FILE_PATH}.rp2.uf2"]
+CMD ["-c", "make clean && make submodules && make -j16 && cp build-${BOARD}/firmware.uf2 /tmp/bilalcast-build/firmware.mp.${MICROPYTHON_FILE_PATH}.rp2.uf2"]
