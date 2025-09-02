@@ -6,7 +6,6 @@ def play_url(url, vol, ip, port):
         device = Chromecast(ip, port)
         device.set_volume(vol)
         device.disconnect()
-
         # Handle casting
         device = Chromecast(ip, port)
         device.play_url(url)
