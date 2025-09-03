@@ -64,7 +64,7 @@ RUN printf '%s\n' \
 # --- (Optional) Freeze your web assets as a compressed VFS -------------------
 # If your HTML/CSS/JS/images live at src/www, pack them into /www (read-only)
 # If they live at src/bilalcast/www instead, change the first ADD to that path.
-ADD src/www /opt/app/www                  
+ADD src/bilalcast/www /opt/app/www                  
 RUN python -m freezefs /opt/app/www /opt/app/www_fs.py \
     --on-import=mount --target /www --compress || true   ### NEW (safe if folder absent)
 RUN [ -f /opt/app/www_fs.py ] && cp /opt/app/www_fs.py modules/www_fs.py || true  ### NEW

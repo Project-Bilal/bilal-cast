@@ -1,4 +1,9 @@
-from bilalcast.cast_functions import play_url, test_cast_url
+try:
+    import www_fs
+except Exception:
+    pass
+
+from bilalcast.cast_functions import test_cast_url
 from bilalcast.scheduler import DING_URL, restart_athan
 from bilalcast.utils import disconnect_wifi
 
@@ -14,7 +19,7 @@ async def bilal_server(app, store, device_registry, wifi_file, athan_loop):
 
     @app.route("/", methods=["GET"])
     def app_index(r):
-        return app.serve_file("settings.html")
+        return app.serve_file("/www/settings.html")
     
     @app.route("/api/devices/refresh", methods=["GET", "POST"])
     def refresh_devices(r):

@@ -150,3 +150,5 @@ firmware.uf2
 firmware.*.uf2
 tmp
 src/MANIFEST
+.DS_Store
+.vscode

@@ -4,7 +4,7 @@ from mdns_client.constants import CLASS_IN, TYPE_SRV
 from mdns_client.structs import DNSQuestion, SRVMixin
 
 
-class ServiceResponse(SRVMixin):
+class Serviceesponse(SRVMixin):
     def __init__(self, name: str, priority: int = 0, weight: int = 0, port: int = 0, target: str = ""):
         self.name = name
         self.priority = priority

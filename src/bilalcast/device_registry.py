@@ -1,8 +1,6 @@
 import asyncio
 import time
 
-
-
 class DeviceRegistry:
     """
     Maintains cached device list + names.

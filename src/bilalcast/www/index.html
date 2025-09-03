@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilal Cast</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%);
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            animation: fadeIn 0.8s ease-in-out;
+        }
+
+        h1 {
+            margin-top: 0;
+            text-align: center;
+            color: #185a9d;
+            font-size: 1.8rem;
+        }
+
+        p {
+            text-align: center;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin: 0.8rem 0 0.3rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #43cea2;
+            box-shadow: 0 0 5px rgba(67, 206, 162, 0.5);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            margin-top: 1.5rem;
+            background: #43cea2;
+            border: none;
+            border-radius: 0.5rem;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #36a582;
+        }
+
+        @keyframes fadeIn {
+            from {opacity: 0; transform: translateY(20px);}
+            to {opacity: 1; transform: translateY(0);}
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Setup</h1>
+        <p>You are connected to the Bilal Cast setup page.
+        <br>
+        Let’s configure Wi-Fi:</p>
+        <form action="/configure" method="POST" autocomplete="off" autocapitalize="none">
+            <label for="ssid">SSID (Wi-Fi name)</label>
+            <input type="text" id="ssid" name="ssid" required>
+
+            <label for="password">Password</label>
+            <input type="text" id="password" name="password" required>
+
+            <button type="submit">Save</button>
+        </form>
+    </div>
+</body>
+</html>
+
