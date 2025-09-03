@@ -1,7 +1,7 @@
-from bilalcast.cast_functions import play_url
+from cast_functions import play_url
 from micropython import const
 import asyncio
-from bilalcast.utils import get_next_prayer
+from utils import get_next_prayer
 import time
 
 import machine, gc

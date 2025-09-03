@@ -9,6 +9,7 @@ async def sync_hms_from_http(url, retries=5, delay_ms=2000):
     while retries:
         try:
             r = requests.get(url)
+            print(r.text)
             try:
                 dh = r.headers.get('date') or r.headers.get('Date')
                 if dh:

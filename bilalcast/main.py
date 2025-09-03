@@ -1,16 +1,52 @@
-try:
-    import www_fs
-except Exception:
-    pass
+# main.py
+from cast_functions import test_cast_url
+import uasyncio as asyncio
+import json
+import os
 
-from bilalcast.cast_functions import test_cast_url
-from bilalcast.scheduler import DING_URL, restart_athan
-from bilalcast.utils import disconnect_wifi
+from phew import server, connect_to_wifi, is_connected_to_wifi
+from captive_portal import captive_portal
+from store import AsyncConfigStore
+from utils import disconnect_wifi, sync_hms_from_http
+from device_registry import DeviceRegistry
+from scheduler import athan_scheduler, restart_athan
 
 
-async def bilal_server(app, store, device_registry, wifi_file, athan_loop):
-    import asyncio
-    import json
+WIFI_FILE = "wifi.json"
+CONFIG_FILE = "config.json"
+
+app = server.Phew()
+
+ATHAN_LOOP = None
+
+async def main():
+    global ATHAN_LOOP
+    ip_address = None
+    
+    try:
+        os.stat(WIFI_FILE)
+        with open(WIFI_FILE) as f:
+            wifi_credentials = json.load(f)
+            ip_address = connect_to_wifi(wifi_credentials["ssid"], wifi_credentials["password"])
+            print("sync_hms_from_http")
+            # await sync_hms_from_http("storage.googleapis.com")
+            print(f"Connected to wifi, IP address {ip_address}")
+            if not is_connected_to_wifi():
+                print("disconnecting wifi")
+                disconnect_wifi(WIFI_FILE)
+    except Exception as e:
+        print("in setup mode", e)
+        captive_portal(WIFI_FILE)
+
+
+    store = AsyncConfigStore(CONFIG_FILE)
+    await store.read_all()
+    
+    device_registry = DeviceRegistry(ip_address=ip_address) 
+    print("device_registry")
+    print("bilal_server")
+    
+    
 
     def _json(data, status=200, headers="application/json"):
         body = json.dumps(data)
@@ -19,7 +55,7 @@ async def bilal_server(app, store, device_registry, wifi_file, athan_loop):
 
     @app.route("/", methods=["GET"])
     def app_index(r):
-        return app.serve_file("/www/settings.html")
+        return "hello world", 200, "text/html"
     
     @app.route("/api/devices/refresh", methods=["GET", "POST"])
     def refresh_devices(r):
@@ -74,3 +110,22 @@ async def bilal_server(app, store, device_registry, wifi_file, athan_loop):
     @app.catchall()
     def ap_catch_all(r):
         return "Not found.", 404
+
+    loop = asyncio.get_event_loop()
+    app.run_as_task(loop)
+    print("app.run_as_task")
+    print(is_connected_to_wifi())
+    # ATHAN_LOOP = loop.create_task(athan_scheduler(store))
+    loop.run_forever()
+    
+    
+
+try:
+    asyncio.run(main())
+except Exception as e:
+    print(e)
+    asyncio.new_event_loop()
+finally:
+    asyncio.new_event_loop()
+    
+

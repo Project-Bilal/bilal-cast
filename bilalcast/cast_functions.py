@@ -1,5 +1,6 @@
-from bilalcast.scheduler import DING_URL
 from cast import Chromecast
+
+DING_URL = "https://storage.googleapis.com/athans/ding.mp3"
 
 def play_url(url, vol, ip, port):
         # Handle volume
