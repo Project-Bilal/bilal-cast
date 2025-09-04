@@ -41,9 +41,11 @@ def connect_to_wifi(ssid, password, timeout_seconds=30):
     network.STAT_CONNECT_FAIL: "connection failed",
     network.STAT_GOT_IP: "got ip address"
   }
-
   wlan = network.WLAN(network.STA_IF)
-  wlan.active(True)    
+  wlan.active(True)  
+  print(ssid, password)  
+  # wlan.config(pm=0xa11140)
+  wlan.disconnect()
   wlan.connect(ssid, password)
   start = time.ticks_ms()
   status = wlan.status()

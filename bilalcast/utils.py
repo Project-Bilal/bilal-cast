@@ -1,3 +1,6 @@
+WIFI_FILE = "wifi.json"
+CONFIG_FILE = "config.json"
+
 async def disconnect_wifi(wifi_file):
     import os, time, machine
     os.remove(wifi_file)

@@ -5,7 +5,7 @@ _SERVER_STOP_TIMER = None
 _REBOOT_AT = None
 
 
-def captive_portal(WIFI_FILE):
+async def captive_portal(WIFI_FILE):
     import asyncio
     import json
     import os    
