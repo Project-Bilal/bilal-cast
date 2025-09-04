@@ -1,7 +1,15 @@
 import asyncio
 import time
 import os
+import gc
 import json
+
+
+def _fsync_best_effort():
+    try:
+        os.sync()
+    except Exception:
+        pass
 
 
 class AsyncConfigStore:
@@ -38,18 +46,17 @@ class AsyncConfigStore:
     async def read_all(self, default=None):
         await self._acquire_lock()
         try:
+            gc.collect()
             try:
                 with open(self._file_path, "r") as f:
                     obj = json.load(f)
-                if not isinstance(obj, dict):
-                    obj = {}
             except Exception:
                 obj = {} if default is None else default
-            # refresh snapshot under lock
-            if isinstance(obj, dict):
-                self._view = dict(obj)
-            else:
-                self._view = {}
+            finally:
+                gc.collect()
+            if not isinstance(obj, dict):
+                obj = {}
+            self._view = dict(obj)
             return obj
         finally:
             self._release_lock()
@@ -58,34 +65,25 @@ class AsyncConfigStore:
         await self._acquire_lock()
         tmp_path = self._file_path + ".tmp"
         try:
+            gc.collect()
             with open(tmp_path, "w") as f:
-                json.dump(data, f)
+                json.dump(data, f, separators=(",", ":"))
                 try:
                     f.flush()
                 except Exception:
                     pass
+            _fsync_best_effort()
             try:
-                try:
-                    os.sync()
-                except Exception:
-                    pass
-                try:
-                    os.remove(self._file_path)
-                except Exception:
-                    pass
-                os.rename(tmp_path, self._file_path)
-                try:
-                    os.sync()
-                except Exception:
-                    pass
-                # update snapshot after successful replace (still under lock)
-                self._view = dict(data) if isinstance(data, dict) else {}
-            finally:
-                try:
-                    # Best-effort cleanup if tmp still around
-                    if os.stat(tmp_path):
-                        os.remove(tmp_path)
-                except Exception:
-                    pass
+                os.remove(self._file_path)
+            except Exception:
+                pass
+            os.rename(tmp_path, self._file_path)
+            _fsync_best_effort()
+            # update snapshot after successful replace (still under lock)
+            self._view = dict(data) if isinstance(data, dict) else {}
         finally:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
             self._release_lock()

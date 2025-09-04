@@ -1,10 +1,4 @@
 
-
-
-
-
-
-
 async def bilal_server():
     import asyncio
     import json
@@ -18,8 +12,7 @@ async def bilal_server():
 
     store = AsyncConfigStore(CONFIG_FILE)
     await store.read_all()
-    ip_address = get_ip_address()
-    device_registry = DeviceRegistry(ip_address=ip_address)
+    device_registry = DeviceRegistry(ip_address=get_ip_address())
     loop = asyncio.get_event_loop()
 
     app = server.Phew()
@@ -61,7 +54,6 @@ async def bilal_server():
     @app.route("/api/settings", methods=["PUT"])
     async def put_settings(r):
         await store.write_all(r.data)
-        await restart_athan(store, athan_loop)
         return "ok", 200
     
     @app.route("/manifest.webmanifest", methods=["GET"])
@@ -88,9 +80,5 @@ async def bilal_server():
     def ap_catch_all(r):
         return "Not found.", 404
 
-
-    store = AsyncConfigStore(CONFIG_FILE)
-    
-    device_registry = DeviceRegistry(ip_address=ip_address)
     app.run_as_task(loop)
     loop.run_forever()

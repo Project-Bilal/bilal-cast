@@ -6,7 +6,7 @@ import os
 
 from phew import connect_to_wifi, is_connected_to_wifi
 from captive_portal import captive_portal
-from utils import WIFI_FILE, disconnect_wifi
+from utils import WIFI_FILE, disconnect_wifi, set_rtc
 
 
 async def main():    
@@ -15,15 +15,14 @@ async def main():
         with open(WIFI_FILE) as f:
             wifi_credentials = json.load(f)
             ip_address = connect_to_wifi(wifi_credentials["ssid"], wifi_credentials["password"])
-            print("sync_hms_from_http")
-            # await sync_hms_from_http("storage.googleapis.com")
+            print("setting rtc: ", set_rtc())
             print(f"Connected to wifi, IP address {ip_address}")
             if not is_connected_to_wifi():
                 print("disconnecting wifi")
                 disconnect_wifi(WIFI_FILE)
     except Exception as e:
         print("in setup mode", e)
-        await captive_portal(WIFI_FILE)
+        await captive_portal()
 
     await bilal_server()
     

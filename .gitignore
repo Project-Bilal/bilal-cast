@@ -152,3 +152,5 @@ tmp
 src/MANIFEST
 .DS_Store
 .vscode
+wifi_file.json
+config_file.json

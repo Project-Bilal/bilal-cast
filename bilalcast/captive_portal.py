@@ -1,3 +1,5 @@
+from utils import WIFI_FILE
+
 AP_NAME = "Bilal Cast Onboarding"
 AP_DOMAIN = "bilalcast.net"
 _REBOOT_TIMER = None
@@ -5,7 +7,7 @@ _SERVER_STOP_TIMER = None
 _REBOOT_AT = None
 
 
-async def captive_portal(WIFI_FILE):
+async def captive_portal():
     import asyncio
     import json
     import os    

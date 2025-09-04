@@ -7,31 +7,46 @@ async def disconnect_wifi(wifi_file):
     time.sleep(1)
     machine.reset()
 
-async def sync_hms_from_http(url, retries=5, delay_ms=2000):
-    import requests, asyncio, machine, time, gc
-    while retries:
+def set_rtc(retries=3, delay_ms=500):
+    import requests
+    import time, machine, gc
+
+    URL = "https://worldtimeapi.org/api/timezone/utc.txt"
+
+    for _ in range(retries):
+        r = None
         try:
-            r = requests.get(url)
-            print(r.text)
-            try:
-                dh = r.headers.get('date') or r.headers.get('Date')
-                if dh:
-                    p = dh.split()  # "Tue, 02 Sep 2025 17:36:55 GMT"
-                    t = p[4] if len(p) >= 5 else None
-                    if t:
-                        hh, mm, ss = int(t[0:2]), int(t[3:5]), int(t[6:8])
-                        print(f"Synced time from {url} to {hh}:{mm}:{ss}")
-                        y, m, d, wd, *_ = time.localtime()
-                        machine.RTC().datetime((y, m, d, wd, hh, mm, ss, 0))
-                        return True
-            finally:
-                r.close()
-        except:
+            r = requests.get(URL)
+            txt = r.text
+            # Look for the utc_datetime line
+            t = None
+            for line in txt.split("\n"):
+                if line.startswith("utc_datetime:"):
+                    # slice out HH:MM:SS from e.g. 2025-09-04T07:37:14.513231+00:00
+                    t = line[ line.find("T")+1 : line.find("T")+9 ]
+                    break
+            if not t:
+                raise ValueError("No utc_datetime found")
+
+            hh, mm, ss = [int(x) for x in t.split(":")]
+
+            rtc = machine.RTC()
+            y, m, d, wd, H, M, S, sub = rtc.datetime()
+            rtc.datetime((y, m, d, wd, hh, mm, ss, 0))
+            return True
+
+        except Exception:
             pass
-        gc.collect()
-        await asyncio.sleep_ms(delay_ms)
-        retries -= 1
+        finally:
+            try:
+                if r: r.close()
+            except: pass
+            gc.collect()
+            time.sleep_ms(delay_ms)
     return False
+
+
+
 
 
 def url_encode(s):
