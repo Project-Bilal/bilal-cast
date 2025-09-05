@@ -2,7 +2,7 @@ import asyncio
 import time
 import os
 import gc
-import json
+import ujson as json
 
 
 def _fsync_best_effort():

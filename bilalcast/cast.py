@@ -1,4 +1,4 @@
-import socket, ssl, json, time
+import socket, ssl, time
 
 from struct import pack, unpack
 import gc

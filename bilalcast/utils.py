@@ -2,14 +2,15 @@ WIFI_FILE = "wifi.json"
 CONFIG_FILE = "config.json"
 
 async def disconnect_wifi(wifi_file):
-    import os, time, machine
+    import uos as os, utime as time, machine
     os.remove(wifi_file)
     time.sleep(1)
     machine.reset()
 
 def set_rtc(retries=3, delay_ms=500):
-    import requests
-    import time, machine, gc
+    import urequests as requests
+    import utime as time
+    import machine, gc
 
     URL = "https://worldtimeapi.org/api/timezone/utc.txt"
 
@@ -46,9 +47,6 @@ def set_rtc(retries=3, delay_ms=500):
     return False
 
 
-
-
-
 def url_encode(s):
     safe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~"
     res = []
@@ -59,14 +57,15 @@ def url_encode(s):
             res.append("%%%02X" % ord(c))
     return "".join(res)
 
-def get_pre_time(t):
-    h = int(t[:2]); m = int(t[3:5])
-    mins = (h*60 + m - 10) % 1440
+def get_pre_time(t, offset=10):
+    h = (ord(t[0])-48)*10 + (ord(t[1])-48)
+    m = (ord(t[3])-48)*10 + (ord(t[4])-48)
+    mins = (h*60 + m - offset) % 1440
     return "%02d:%02d" % (mins // 60, mins % 60)
 
 
 async def fetch_with_retry(url, retries=5, delay_ms=2000):
-    import requests, asyncio, gc, json
+    import urequests as requests, uasyncio as asyncio, gc, json
     while retries:
         try:
             r = requests.get(url)
@@ -90,7 +89,7 @@ async def get_next_prayer(method=None,
                           address=None, 
                           latitude=None, 
                           longitude=None):
-    import time
+    import utime as time
     y, m, d, *_ = time.localtime()
     base_url = "https://api.aladhan.com/v1/"
     q = None

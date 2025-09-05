@@ -1,27 +1,28 @@
 
+from scheduler import play
+
+
 async def bilal_server():
-    import asyncio
-    import json
+    import uasyncio as asyncio
+    import ujson as json
     from phew import server, get_ip_address
 
     from device_registry import DeviceRegistry
     from store import AsyncConfigStore
-    from cast_functions import test_cast_url
-    from scheduler import DING_URL, restart_athan
+    from scheduler import restart_athan
     from utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
 
     store = AsyncConfigStore(CONFIG_FILE)
     await store.read_all()
     device_registry = DeviceRegistry(ip_address=get_ip_address())
-    loop = asyncio.get_event_loop()
 
+    loop = asyncio.get_event_loop()
     app = server.Phew()
     
 
     def _json(data, status=200, headers="application/json"):
         body = json.dumps(data)
         return body, status, headers
-
 
     @app.route("/", methods=["GET"])
     def app_index(r):
@@ -39,7 +40,7 @@ async def bilal_server():
     
     @app.route("/api/cast/test", methods=["POST"])
     def test_cast(r):
-        asyncio.create_task(test_cast_url(r.data.get('value', DING_URL), r.data.get('volume', 10), r.data['host'], r.data['port']))
+        asyncio.create_task(play(r.data.get('file', 'ding.mp3'), r.data['host'], r.data['port'], r.data.get('volume', 7)))
         return "ok", 200, "text/html"
     
     @app.route("/api/wifi/disconnect", methods=["POST", "GET"])
@@ -54,7 +55,19 @@ async def bilal_server():
     @app.route("/api/settings", methods=["PUT"])
     async def put_settings(r):
         await store.write_all(r.data)
+        # Restart athan in the background (non-blocking for the HTTP handler)
+        asyncio.create_task(restart_athan(store))
         return "ok", 200
+
+    @app.route("/icons/icon-192.png", methods=["GET"])
+    def icon_192(r):
+        #TODO add icon
+        return app.serve_file("www/icon.png")
+    
+    @app.route("/icons/icon-512.png", methods=["GET"])
+    def icon_512(r):
+        #TODO add icon
+        return app.serve_file("www/icon.png")
     
     @app.route("/manifest.webmanifest", methods=["GET"])
     def web_manifest(r):
@@ -81,4 +94,5 @@ async def bilal_server():
         return "Not found.", 404
 
     app.run_as_task(loop)
+    await restart_athan(store)
     loop.run_forever()

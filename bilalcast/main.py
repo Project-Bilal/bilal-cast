@@ -1,8 +1,8 @@
 # main.py
 from bilal_server import bilal_server  
-import asyncio
-import json
-import os
+import uasyncio as asyncio
+import ujson as json
+import uos as os
 
 from phew import connect_to_wifi, is_connected_to_wifi
 from captive_portal import captive_portal

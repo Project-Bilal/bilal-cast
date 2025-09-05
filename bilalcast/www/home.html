@@ -35,6 +35,11 @@
       sizes="512x512"
       href="/icons/icon-512.png"
     />
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+    />
 
     <style>
       :root {
@@ -154,6 +159,7 @@
         color: var(--muted);
         margin: 6px 2px;
       }
+
       .grid {
         display: grid;
         gap: 14px;
@@ -163,6 +169,7 @@
           grid-template-columns: 1fr 1fr;
         }
       }
+
       .small {
         font-size: 12px;
         color: var(--muted);
@@ -170,6 +177,7 @@
       .warn {
         color: var(--danger);
       }
+
       .device-list {
         display: grid;
         gap: 10px;
@@ -184,6 +192,7 @@
         border-radius: 14px;
         background: #0f172a;
       }
+
       .pb {
         height: 10px;
         background: #0f172a;
@@ -198,31 +207,8 @@
         background: var(--accent2);
         transition: width 0.2s ease;
       }
-      .prayers {
-        display: grid;
-        gap: 10px;
-        margin-top: 8px;
-      }
-      .pr {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        justify-content: space-between;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        background: #0f172a;
-      }
-      .pr .left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .tag {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
+      .hr {
+        opacity: 0.3;
       }
       .toast {
         position: fixed;
@@ -308,8 +294,26 @@
       }
 
       /* tap-to-open cast field */
-      #castDeviceDisplay {
+      #castDeviceDisplay,
+      #testDeviceDisplay {
         cursor: pointer;
+      }
+
+      /* Chips row under location input */
+      .chips-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        overflow: hidden; /* keep to one row */
+        margin-top: 8px;
+      }
+      .chip {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border);
       }
 
       /* Mobile tweaks */
@@ -334,30 +338,14 @@
           min-height: 44px;
           border-radius: 12px;
         }
-        .pr {
-          padding: 8px 10px;
-        }
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <header><div class="brand">Bilal Cast</div></header>
-
-      <!-- Prayer Times Preview (top) -->
-      <section class="card">
-        <div class="row">
-          <strong>Prayer times (preview)</strong>
-          <div class="spacer"></div>
-          <button type="button" class="btn ghost" id="previewReloadBtn">
-            Refresh
-          </button>
-        </div>
-        <div id="previewStatus" class="small">
-          Enter a location to preview times…
-        </div>
-        <div id="prayers" class="prayers"></div>
-      </section>
+      <header>
+        <div class="brand">Bilal Cast</div>
+      </header>
 
       <!-- Settings -->
       <form class="card" id="settingsForm" novalidate>
@@ -365,7 +353,7 @@
           <strong>Settings</strong>
           <div class="spacer"></div>
           <button type="button" class="btn ghost" id="reloadSettingsBtn">
-            Reload
+            <i class="fa fa-refresh"></i>
           </button>
         </div>
 
@@ -423,6 +411,14 @@
           </div>
         </div>
 
+        <!-- One-row prayer timing chips -->
+        <div
+          id="locChips"
+          class="chips-row"
+          aria-live="polite"
+          style="display: none"
+        ></div>
+
         <!-- School / Method / LatAdj / Cast Device -->
         <div class="grid cols-2" style="margin-top: 8px">
           <div>
@@ -456,86 +452,71 @@
             ></div>
           </div>
         </div>
-
+        <hr class="hr" />
         <!-- Athan & Reminder grouped into cards -->
         <div class="grid" style="margin-top: 14px">
-          <section class="card">
-            <div class="row"><strong>Fajr</strong></div>
-            <div class="grid cols-2" style="margin-top: 8px">
-              <div>
-                <label for="vol-fajr">Fajr Volume</label>
-                <input
-                  id="vol-fajr"
-                  class="range"
-                  type="range"
-                  min="0"
-                  max="10"
-                  step="1"
-                  value="7"
-                />
-                <div class="small" id="out-fajr">7/10</div>
-              </div>
-              <div>
-                <label for="file-fajr">Fajr Audio</label>
-                <div class="row">
-                  <select id="file-fajr" class="input" style="flex: 1"></select>
-                  <button
-                    type="button"
-                    id="test-fajr"
-                    class="btn ghost"
-                    title="Test Fajr audio on selected Cast"
-                  >
-                    Test
-                  </button>
-                </div>
-              </div>
+          <!-- Fajr (stacked) -->
+          <div class="row"><strong>Fajr</strong></div>
+          <div class="grid" style="margin-top: 8px">
+            <div>
+              <label for="vol-fajr">Fajr Volume</label>
+              <input
+                id="vol-fajr"
+                class="range"
+                type="range"
+                min="0"
+                max="1"
+                step="any"
+                value=".70"
+                list="vol-options"
+              />
+              <div class="small" id="out-fajr">70%</div>
             </div>
-          </section>
-
-          <section class="card">
-            <div class="row"><strong>Other prayers</strong></div>
-            <div class="grid cols-2" style="margin-top: 8px">
-              <div>
-                <label for="vol-athan">Athan Volume</label>
-                <input
-                  id="vol-athan"
-                  class="range"
-                  type="range"
-                  min="0"
-                  max="10"
-                  step="1"
-                  value="7"
-                />
-                <div class="small" id="out-athan">7/10</div>
-              </div>
-              <div>
-                <label for="file-athan">Athan Audio</label>
-                <div class="row">
-                  <select
-                    id="file-athan"
-                    class="input"
-                    style="flex: 1"
-                  ></select>
-                  <button
-                    type="button"
-                    id="test-athan"
-                    class="btn ghost"
-                    title="Test Athan audio on selected Cast"
-                  >
-                    Test
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label for="file-rem">Reminder Audio</label>
-                <select id="file-rem" class="input"></select>
-              </div>
-              <div>
-                <label for="min-rem">Reminder minutes prior</label>
-                <select id="min-rem" class="input"></select>
-              </div>
+            <div>
+              <label for="file-fajr">Fajr Audio</label>
+              <select id="file-fajr" class="input"></select>
             </div>
-          </section>
+          </div>
+          <hr class="hr" />
+          <!-- Other prayers (stacked) -->
+          <div class="row"><strong>Other prayers</strong></div>
+          <div class="grid" style="margin-top: 8px">
+            <div>
+              <label for="vol-athan">Athan Volume</label>
+              <input
+                id="vol-athan"
+                class="range"
+                type="range"
+                min="0"
+                max="1"
+                step="any"
+                value=".70"
+                list="vol-options"
+              />
+              <div class="small" id="out-athan">70%</div>
+            </div>
+            <div>
+              <label for="file-athan">Athan Audio</label>
+              <select id="file-athan" class="input"></select>
+            </div>
+          </div>
+          <hr class="hr" />
+          <!-- Reminder (own card, applies to all) -->
+          <div class="row">
+            <strong>Reminder</strong>
+            <div class="spacer"></div>
+            <span class="small">Applies to all prayers</span>
+          </div>
+          <div class="grid" style="margin-top: 8px">
+            <div>
+              <label for="file-rem">Reminder Audio</label>
+              <select id="file-rem" class="input"></select>
+            </div>
+            <div>
+              <label for="min-rem">Reminder minutes prior</label>
+              <select id="min-rem" class="input"></select>
+            </div>
+          </div>
         </div>
 
         <!-- Save -->
@@ -551,6 +532,58 @@
           </button>
         </div>
       </form>
+
+      <!-- Test audio (bottom card) -->
+      <section class="card" id="testCard">
+        <div class="row">
+          <strong>Test audio</strong>
+          <div class="spacer"></div>
+          <span class="small">Not saved — for quick testing</span>
+        </div>
+        <div class="grid" style="margin-top: 8px">
+          <div>
+            <label for="testDeviceDisplay">Google Cast Device</label>
+            <input
+              id="testDeviceDisplay"
+              class="input"
+              type="text"
+              readonly
+              role="button"
+              aria-controls="castModal"
+              aria-haspopup="dialog"
+              placeholder="Tap to select a device"
+            />
+            <div
+              id="testDeviceWarning"
+              class="small warn"
+              style="display: none; margin-top: 6px"
+            ></div>
+          </div>
+          <div>
+            <label for="file-test">Audio file</label>
+            <select id="file-test" class="input"></select>
+          </div>
+          <div>
+            <label for="vol-test">Volume</label>
+            <input
+              id="vol-test"
+              class="range"
+              type="range"
+              min="0"
+              max="1"
+              step="any"
+              value=".70"
+              list="vol-options"
+            />
+            <div class="small" id="out-test">70%</div>
+          </div>
+          <div class="row">
+            <button id="sendTestBtn" class="btn" style="width: 100%">
+              Send test
+            </button>
+          </div>
+        </div>
+      </section>
 
       <!-- Bottom: Disconnect Wi‑Fi -->
       <section class="card">
@@ -682,6 +715,13 @@
 
     <div id="toast" class="toast"></div>
 
+    <datalist id="vol-options">
+      <option value="0">0</option>
+      <option value="0.25">0.25</option>
+      <option value="0.5">0.5</option>
+      <option value="0.75">0.75</option>
+      <option value="1">1</option>
+    </datalist>
     <script>
       (() => {
         const API = {
@@ -703,7 +743,7 @@
               ...(opts.headers || {}),
             },
           });
-          if (!res.ok) throw new Error(`${res.status}`);
+          if (!res.ok) throw new Error(String(res.status));
           const ct = res.headers.get("content-type") || "";
           return ct.includes("application/json") ? res.json() : res.text();
         };
@@ -832,6 +872,8 @@
           settings: null,
           baseline: null,
           castDevice: null,
+          testDevice: null,
+          modalTarget: "settings", // 'settings' | 'test'
           devMap: new Map(),
           pollCancel: false,
           _scrollY: 0,
@@ -864,7 +906,7 @@
                 }</option>`
             )
             .join("");
-          ["file-fajr", "file-athan", "file-rem"].forEach((id) => {
+          ["file-fajr", "file-athan", "file-rem", "file-test"].forEach((id) => {
             const el = $(id);
             if (el) el.innerHTML = opt;
           });
@@ -897,7 +939,7 @@
                     : null,
                 }
               : null,
-            // simplified audio config
+            // store UI volumes as 0..10 integers
             fajrVol: +$("vol-fajr").value || 0,
             fajrFile: $("file-fajr").value || "",
             athanVol: +$("vol-athan").value || 0,
@@ -940,9 +982,9 @@
                   port: Number.isFinite(+cast.port) ? +cast.port : null,
                 }
               : null,
-            fajrVol: Number.isFinite(+P.Fajr?.volume) ? +P.Fajr.volume : 7,
+            fajrVol: P.Fajr?.volume,
             fajrFile: P.Fajr?.file || "athan_fajr_1.mp3",
-            athanVol: Number.isFinite(+other.volume) ? +other.volume : 7,
+            athanVol: other.volume,
             athanFile: other.file || "athan_1.mp3",
             remFile:
               P.reminder && P.reminder.file ? P.reminder.file : "ding.mp3",
@@ -1011,11 +1053,16 @@
             $("castDeviceDisplay").value = formatDevice(st.castDevice) || "";
             $("deviceWarning").style.display = "none";
 
+            // mirror saved device to test device by default
+            st.testDevice = st.castDevice ? { ...st.castDevice } : null;
+            $("testDeviceDisplay").value = formatDevice(st.testDevice) || "";
+            $("testDeviceWarning").style.display = "none";
+
             const snap = snapshotFromSettings(s);
             $("vol-fajr").value = snap.fajrVol;
-            $("out-fajr").textContent = `${snap.fajrVol}/10`;
+            $("out-fajr").textContent = `${(snap.fajrVol * 100).toFixed(0)}%`;
             $("vol-athan").value = snap.athanVol;
-            $("out-athan").textContent = `${snap.athanVol}/10`;
+            $("out-athan").textContent = `${(snap.athanVol * 100).toFixed(0)}%`;
             $("file-fajr").value = snap.fajrFile;
             $("file-athan").value = snap.athanFile;
             $("file-rem").value = snap.remFile;
@@ -1030,15 +1077,8 @@
           }
         }
 
-        /* preview (AlAdhan) */
+        /* Prayer timings chips (AlAdhan) */
         const PRAYER_ORDER = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
-        const PRAYER_ICONS = {
-          Fajr: "🌅",
-          Dhuhr: "☀️",
-          Asr: "🌤️",
-          Maghrib: "🌆",
-          Isha: "🌙",
-        };
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
         const pad2 = (n) => (n < 10 ? "0" : "") + n;
         const todayStr = () => {
@@ -1068,7 +1108,6 @@
           const q = new URLSearchParams({
             method: String(method),
             school: String(school),
-            iso8601: "true",
           });
           if (tz) q.set("timezonestring", tz);
           q.set("latitudeAdjustmentMethod", String(latAdj ?? 3));
@@ -1081,46 +1120,37 @@
             return `${base}/timingsByAddress/${date}?${q}`;
           }
         }
-        function renderPrayerPreview(t) {
-          const wrap = $("prayers"),
-            status = $("previewStatus");
-          wrap.innerHTML = "";
-          if (!t) {
-            status.textContent = "Enter a location to preview times…";
+        function toHHMM(s) {
+          const str = String(s || "");
+          // Fallback for "05:02" or "05:02 (EDT)"
+          const plain = str.match(/(\d{1,2}):(\d{2})/);
+          if (plain) {
+            let h_chip = parseInt(plain[1]);
+            if (h_chip > 12) {
+              h_chip = h_chip - 12;
+            }
+            return `${h_chip}:${plain[2]}`;
+          }
+          return str;
+        }
+        function renderTimingChips(timings) {
+          const row = $("locChips");
+          row.innerHTML = "";
+          if (!timings) {
+            row.style.display = "none";
             return;
           }
-          const now = Date.now();
-          let next = null,
-            best = Infinity;
           PRAYER_ORDER.forEach((p) => {
-            const d = new Date(t[p]).getTime();
-            if (!Number.isNaN(d) && d > now && d - now < best) {
-              next = p;
-              best = d - now;
-            }
+            const val = toHHMM(timings[p]);
+            if (val)
+              row.insertAdjacentHTML(
+                "beforeend",
+                `<span class="chip" style="font-size: 0.8em;">${p[0]} - ${val}</span>`
+              );
           });
-          PRAYER_ORDER.forEach((p) => {
-            const iso = t[p];
-            const d = iso ? new Date(iso) : null;
-            const timeStr =
-              d && !Number.isNaN(d)
-                ? d.toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })
-                : "—";
-            wrap.insertAdjacentHTML(
-              "beforeend",
-              `<div class="pr"><div class="left"><span>${
-                PRAYER_ICONS[p] || ""
-              }</span><strong>${p}</strong></div><div class="row" style="gap:8px;align-items:center">${
-                p === next ? '<span class="tag">next</span>' : ""
-              }<div>${timeStr}</div></div></div>`
-            );
-          });
-          status.textContent = "";
+          row.style.display = "flex";
         }
-        async function fetchPrayerPreview() {
+        async function fetchTimingChips() {
           const useCoords = $("useCoords").checked,
             addr = $("address").value.trim();
           const lat = parseFloat($("latitude").value),
@@ -1128,6 +1158,8 @@
           const school = +$("school").value,
             method = +$("method").value,
             ladj = +$("latAdj").value || 3;
+
+          // basic validation of chosen mode
           if (useCoords) {
             if (
               !(
@@ -1139,17 +1171,16 @@
                 lon <= 180
               )
             ) {
-              renderPrayerPreview(null);
+              renderTimingChips(null);
               return;
             }
           } else {
             if (!addr) {
-              renderPrayerPreview(null);
+              renderTimingChips(null);
               return;
             }
           }
-          $("previewStatus").textContent = "Loading…";
-          $("prayers").innerHTML = "";
+
           try {
             const url = buildTimingsURL({
               useCoords,
@@ -1173,57 +1204,14 @@
                   Isha: tim.Isha,
                 }
               : null;
-            renderPrayerPreview(filtered);
+            renderTimingChips(filtered);
           } catch {
-            $("previewStatus").textContent = "Could not load prayer times";
-            $("prayers").innerHTML = "";
+            renderTimingChips(null);
           }
         }
-        const fetchPreviewDebounced = debounce(fetchPrayerPreview, 600);
+        const fetchChipsDebounced = debounce(fetchTimingChips, 600);
 
-        /* Test audio (Fajr/Athan) */
-        async function testAudio(kind) {
-          const dev = st.castDevice;
-          if (!dev || (!dev.name && !dev.host)) {
-            toast("Please select a Google Cast device first");
-            $("castDeviceDisplay").focus();
-            return;
-          }
-          const file = (kind === "fajr" ? $("file-fajr") : $("file-athan"))
-            .value;
-          const volume =
-            +(kind === "fajr" ? $("vol-fajr").value : $("vol-athan").value) ||
-            0;
-          if (!file) {
-            toast("Please choose an audio file to test");
-            return;
-          }
-          const btn = kind === "fajr" ? $("test-fajr") : $("test-athan");
-          const orig = btn.textContent;
-          btn.textContent = "Testing…";
-          btn.disabled = true;
-          try {
-            const payload = {
-              name: dev.name,
-              ...(dev.host ? { host: dev.host } : {}),
-              ...(Number.isFinite(+dev.port) ? { port: +dev.port } : {}),
-              file,
-              volume,
-            };
-            await J(API.castTest, {
-              method: "POST",
-              body: JSON.stringify(payload),
-            });
-            toast(`Test sent to ${dev.name || dev.host}`);
-          } catch {
-            toast("Test failed");
-          } finally {
-            btn.textContent = orig;
-            btn.disabled = false;
-          }
-        }
-
-        /* Save */
+        /* Save (now sends volumes as 0.0–1.0 floats) */
         async function saveSettings(e) {
           e.preventDefault();
           const snap = snapshotFromUI();
@@ -1246,13 +1234,21 @@
 
           const minutes = +snap.remMinutes; // 0..30 from dropdown, 0 = off
           const P = {
-            Fajr: { enabled: true, volume: snap.fajrVol, file: snap.fajrFile },
+            Fajr: {
+              enabled: true,
+              volume: snap.fajrVol,
+              file: snap.fajrFile,
+            },
             Dhuhr: {
               enabled: true,
               volume: snap.athanVol,
               file: snap.athanFile,
             },
-            Asr: { enabled: true, volume: snap.athanVol, file: snap.athanFile },
+            Asr: {
+              enabled: true,
+              volume: snap.athanVol,
+              file: snap.athanFile,
+            },
             Maghrib: {
               enabled: true,
               volume: snap.athanVol,
@@ -1265,7 +1261,7 @@
             },
             reminder: {
               enabled: minutes > 0,
-              volume: snap.athanVol,
+              volume: snap.athanVol, // reminder follows athan volume
               file: snap.remFile,
               minutes,
             },
@@ -1302,6 +1298,46 @@
             updateSaveEnabled();
           } catch {
             toast("Save failed");
+          } finally {
+            btn.textContent = orig;
+            btn.disabled = false;
+          }
+        }
+
+        /* Test audio card */
+        async function sendTest() {
+          const dev = st.testDevice;
+          if (!dev || (!dev.name && !dev.host)) {
+            toast("Please select a Google Cast device to test");
+            $("testDeviceDisplay").focus();
+            return;
+          }
+          const file = $("file-test").value;
+          const volFloat = $("vol-test").value;
+          if (!file) {
+            toast("Please choose an audio file to test");
+            return;
+          }
+
+          const btn = $("sendTestBtn");
+          const orig = btn.textContent;
+          btn.textContent = "Testing…";
+          btn.disabled = true;
+          try {
+            const payload = {
+              name: dev.name,
+              ...(dev.host ? { host: dev.host } : {}),
+              ...(isNum(+dev.port) ? { port: +dev.port } : {}),
+              file,
+              volume: $("vol-test").value, // float 0.0–1.0
+            };
+            await J(API.castTest, {
+              method: "POST",
+              body: JSON.stringify(payload),
+            });
+            toast(`Test sent to ${dev.name || dev.host}`);
+          } catch {
+            toast("Test failed");
           } finally {
             btn.textContent = orig;
             btn.disabled = false;
@@ -1420,7 +1456,7 @@
           if (shouldShowInstallNudge()) setTimeout(showInstallNudge, 1200);
         }
 
-        /* Cast device modal (lazy scan) + scroll lock */
+        /* Cast device modal (shared for Settings and Test) + scroll lock */
         const castModal = $("castModal");
         let savedScroll = 0;
         function lockScroll() {
@@ -1438,7 +1474,8 @@
           document.body.style.right = "";
           window.scrollTo(0, savedScroll || 0);
         }
-        function showCastModal() {
+        function showCastModal(target = "settings") {
+          st.modalTarget = target;
           castModal.classList.add("show");
           lockScroll();
           lazyLoadDevices();
@@ -1449,13 +1486,25 @@
           unlockScroll();
         }
 
-        $("castDeviceDisplay").addEventListener("click", showCastModal);
+        $("castDeviceDisplay").addEventListener("click", () =>
+          showCastModal("settings")
+        );
         $("castDeviceDisplay").addEventListener("keydown", (e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            showCastModal();
+            showCastModal("settings");
           }
         });
+        $("testDeviceDisplay").addEventListener("click", () =>
+          showCastModal("test")
+        );
+        $("testDeviceDisplay").addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            showCastModal("test");
+          }
+        });
+
         $("castCloseBtn").addEventListener("click", hideCastModal);
         castModal.addEventListener("click", (e) => {
           if (e.target.hasAttribute("data-close")) hideCastModal();
@@ -1479,7 +1528,7 @@
           st.devMap.clear();
           if (!list || !list.length) {
             box.innerHTML = '<div class="small">No devices found yet…</div>';
-            updateNetworkWarning();
+            updateNetworkWarnings();
             return;
           }
           box.innerHTML = list
@@ -1495,14 +1544,17 @@
               const hp = o.host
                 ? `${o.host}${isNum(+o.port) ? ":" + o.port : ""}`
                 : "";
-              return `<div class="device"><div><div>${
-                o.name || "Device " + (i + 1)
-              }</div>${
+              return `<div class="device">
+                      <div><div>${o.name || "Device " + (i + 1)}</div>${
                 hp ? `<div class="small">${hp}</div>` : ""
-              }</div><div class="row" style="gap:8px"><button class="btn ghost" data-test="${k}">Test</button><button class="btn" data-select="${k}">Select</button></div></div>`;
+              }</div>
+                      <div class="row" style="gap:8px">
+                        <button class="btn" data-select="${k}">Select</button>
+                      </div>
+                    </div>`;
             })
             .join("");
-          updateNetworkWarning();
+          updateNetworkWarnings();
         }
         async function fetchDevicesOnce() {
           const raw = await J(API.devices);
@@ -1589,38 +1641,75 @@
             const key = btnSel.getAttribute("data-select");
             const dev = st.devMap.get(key);
             if (!dev) return toast("Device not found");
-            st.castDevice = {
-              name: dev.name,
-              ...(dev.host ? { host: dev.host } : {}),
-              ...(isNum(dev.port) ? { port: dev.port } : {}),
-            };
-            $("castDeviceDisplay").value = formatDevice(st.castDevice);
+            if (st.modalTarget === "test") {
+              st.testDevice = {
+                name: dev.name,
+                ...(dev.host ? { host: dev.host } : {}),
+                ...(isNum(dev.port) ? { port: dev.port } : {}),
+              };
+              $("testDeviceDisplay").value = formatDevice(st.testDevice);
+            } else {
+              st.castDevice = {
+                name: dev.name,
+                ...(dev.host ? { host: dev.host } : {}),
+                ...(isNum(dev.port) ? { port: dev.port } : {}),
+              };
+              $("castDeviceDisplay").value = formatDevice(st.castDevice);
+              updateSaveEnabled();
+            }
             hideCastModal();
-            updateNetworkWarning();
-            updateSaveEnabled();
+            updateNetworkWarnings();
           }
         });
-        function updateNetworkWarning() {
-          const warn = $("deviceWarning");
+
+        function updateNetworkWarnings() {
+          // settings device warning
+          const warnA = $("deviceWarning");
           if (!st.castDevice) {
-            warn.style.display = "none";
-            warn.textContent = "";
-            return;
+            warnA.style.display = "none";
+            warnA.textContent = "";
+          } else {
+            const wKey = deviceKey(st.castDevice);
+            const existsByKey = wKey && st.devMap.has(wKey);
+            const existsByName =
+              !existsByKey &&
+              st.castDevice.name &&
+              [...st.devMap.values()].some(
+                (v) => v.name === st.castDevice.name
+              );
+            if (existsByKey || existsByName) {
+              warnA.style.display = "none";
+              warnA.textContent = "";
+            } else if (st.devMap.size > 0) {
+              warnA.textContent = `Selected device "${formatDevice(
+                st.castDevice
+              )}" was not found on the network in the last scan.`;
+              warnA.style.display = "";
+            }
           }
-          const wKey = deviceKey(st.castDevice);
-          const existsByKey = wKey && st.devMap.has(wKey);
-          const existsByName =
-            !existsByKey &&
-            st.castDevice.name &&
-            [...st.devMap.values()].some((v) => v.name === st.castDevice.name);
-          if (existsByKey || existsByName) {
-            warn.style.display = "none";
-            warn.textContent = "";
-          } else if (st.devMap.size > 0) {
-            warn.textContent = `Selected device "${formatDevice(
-              st.castDevice
-            )}" was not found on the network in the last scan.`;
-            warn.style.display = "";
+          // test device warning
+          const warnB = $("testDeviceWarning");
+          if (!st.testDevice) {
+            warnB.style.display = "none";
+            warnB.textContent = "";
+          } else {
+            const wKey = deviceKey(st.testDevice);
+            const existsByKey = wKey && st.devMap.has(wKey);
+            const existsByName =
+              !existsByKey &&
+              st.testDevice.name &&
+              [...st.devMap.values()].some(
+                (v) => v.name === st.testDevice.name
+              );
+            if (existsByKey || existsByName) {
+              warnB.style.display = "none";
+              warnB.textContent = "";
+            } else if (st.devMap.size > 0) {
+              warnB.textContent = `Selected device "${formatDevice(
+                st.testDevice
+              )}" was not found on the network in the last scan.`;
+              warnB.style.display = "";
+            }
           }
         }
 
@@ -1633,31 +1722,30 @@
           await loadMethodsFromAlAdhan();
           await loadSettings();
 
-          // preview
-          fetchPrayerPreview();
-          $("previewReloadBtn").addEventListener("click", fetchPrayerPreview);
+          // initial chips
+          fetchTimingChips();
 
           // settings events
           $("reloadSettingsBtn").addEventListener("click", async () => {
             await loadSettings();
-            fetchPrayerPreview();
+            fetchTimingChips();
           });
           $("settingsForm").addEventListener("submit", saveSettings);
 
           $("useCoords").addEventListener("change", (e) => {
             setLocationModeUI(e.target.checked);
-            fetchPreviewDebounced();
+            fetchChipsDebounced();
             updateSaveEnabled();
           });
           ["address", "latitude", "longitude"].forEach((id) =>
             $(id).addEventListener("input", () => {
-              fetchPreviewDebounced();
+              fetchChipsDebounced();
               updateSaveEnabled();
             })
           );
           ["school", "method", "latAdj"].forEach((id) =>
             $(id).addEventListener("change", () => {
-              fetchPreviewDebounced();
+              fetchChipsDebounced();
               updateSaveEnabled();
             })
           );
@@ -1670,20 +1758,27 @@
 
           // audio/volume/minutes events
           $("vol-fajr").addEventListener("input", () => {
-            $("out-fajr").textContent = `${$("vol-fajr").value}/10`;
+            $("out-fajr").textContent = `${($("vol-fajr").value * 100).toFixed(
+              0
+            )}%`;
             updateSaveEnabled();
           });
           $("vol-athan").addEventListener("input", () => {
-            $("out-athan").textContent = `${$("vol-athan").value}/10`;
+            $("out-athan").textContent = `${(
+              $("vol-athan").value * 100
+            ).toFixed(0)}%`;
             updateSaveEnabled();
           });
           ["file-fajr", "file-athan", "file-rem", "min-rem"].forEach((id) =>
             $(id).addEventListener("change", updateSaveEnabled)
           );
 
-          // test buttons
-          $("test-fajr").addEventListener("click", () => testAudio("fajr"));
-          $("test-athan").addEventListener("click", () => testAudio("athan"));
+          // test card events
+          $("vol-test").addEventListener("input", () => {
+            const v = +$("vol-test").value || 0;
+            $("out-test").textContent = `${(v * 100).toFixed(0)}%`;
+          });
+          $("sendTestBtn").addEventListener("click", sendTest);
 
           // iOS install nudge
           wireInstallUI();
