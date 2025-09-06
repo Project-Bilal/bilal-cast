@@ -45,9 +45,10 @@ RUN git submodule update --init -- lib/pico-sdk lib/tinyusb
 
 WORKDIR /opt/app/micropython/ports/rp2
 
-# --- Freeze your code --------------------------------------------------------
+# --- Freeze code --------------------------------------------------------
 # Copy your bilalcast package (contains /src/bilalcast/main.py etc.)
-ADD bilalcast modules/bilalcast       
+ADD bilalcast modules/bilalcast 
+RUN rm -rf modules/bilalcast/www      
 
 # Create a tiny frozen main.py that runs your bilalcast.main on boot
 RUN printf '%s\n' \
@@ -58,13 +59,11 @@ RUN printf '%s\n' \
 "import bilalcast.main" \
 > modules/main.py                        
 
-# --- (Optional) Freeze your web assets as a compressed VFS -------------------
-# If your HTML/CSS/JS/images live at src/www, pack them into /www (read-only)
-# If they live at src/bilalcast/www instead, change the first ADD to that path.
+# --- Freeze web assets as a compressed VFS -------------------
 ADD bilalcast/www /opt/app/www                  
 RUN python -m freezefs /opt/app/www /opt/app/www_fs.py \
-    --on-import=mount --target /www --compress || true 
-RUN [ -f /opt/app/www_fs.py ] && cp /opt/app/www_fs.py modules/www_fs.py || true  
+    --on-import=mount --target /www --compress && rm -rf /opt/app/www
+RUN cp /opt/app/www_fs.py modules/www_fs.py
   
 
 ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
