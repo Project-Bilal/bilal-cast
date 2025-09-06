@@ -150,7 +150,10 @@ firmware.uf2
 firmware.*.uf2
 tmp
 src/MANIFEST
-.DS_Store
-.vscode
 wifi_file.json
 config_file.json
+**/.DS_Store
+**/__pycache__/
+**/*.log
+**/*.uf2
+**/.vscode
