@@ -22,8 +22,8 @@ class DeviceRegistry:
         self._lock = asyncio.Lock()
 
         # Discovery
-        from mdns_client import Client
-        from mdns_client.service_discovery.txt_discovery import TXTServiceDiscovery
+        from bilalcast.mdns_client import Client
+        from bilalcast.mdns_client.service_discovery.txt_discovery import TXTServiceDiscovery
         self._discovery = TXTServiceDiscovery(Client(ip_address))
 
     # ----- Public -----

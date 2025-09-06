@@ -1,7 +1,7 @@
 import time
 
-from mdns_client.constants import CLASS_IN, TYPE_SRV
-from mdns_client.structs import DNSQuestion, SRVMixin
+from bilalcast.mdns_client.constants import CLASS_IN, TYPE_SRV
+from bilalcast.mdns_client.structs import DNSQuestion, SRVMixin
 
 
 class ServiceResponse(SRVMixin):

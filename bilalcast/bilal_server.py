@@ -1,16 +1,16 @@
 
-from scheduler import play
+from bilalcast.scheduler import play
 
 
 async def bilal_server():
     import uasyncio as asyncio
     import ujson as json
-    from phew import server, get_ip_address
+    from bilalcast.phew import server, get_ip_address
 
-    from device_registry import DeviceRegistry
-    from store import AsyncConfigStore
-    from scheduler import restart_athan
-    from utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
+    from bilalcast.device_registry import DeviceRegistry
+    from bilalcast.store import AsyncConfigStore
+    from bilalcast.scheduler import restart_athan
+    from bilalcast.utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
 
     store = AsyncConfigStore(CONFIG_FILE)
     await store.read_all()

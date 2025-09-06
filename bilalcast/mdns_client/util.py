@@ -2,7 +2,7 @@ import struct
 
 import uasyncio
 
-from mdns_client.constants import REPEAT_TYPE_FLAG, TYPE_CNAME, TYPE_MX, TYPE_NS, TYPE_PTR, TYPE_SOA, TYPE_SRV
+from bilalcast.mdns_client.constants import REPEAT_TYPE_FLAG, TYPE_CNAME, TYPE_MX, TYPE_NS, TYPE_PTR, TYPE_SOA, TYPE_SRV
 
 
 def dotted_ip_to_bytes(ip: str) -> bytes:

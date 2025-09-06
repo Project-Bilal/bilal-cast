@@ -1,4 +1,4 @@
-from utils import WIFI_FILE
+from bilalcast.utils import WIFI_FILE
 
 AP_NAME = "Bilal Cast Onboarding"
 AP_DOMAIN = "bilalcast.net"
@@ -12,8 +12,8 @@ async def captive_portal():
     import json
     import os    
     import machine, time
-    from phew import dns, access_point, server
-    from phew.template import render_template
+    from bilalcast.phew import dns, access_point, server
+    from bilalcast.phew.template import render_template
 
     app = server.Phew()  
 

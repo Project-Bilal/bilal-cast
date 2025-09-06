@@ -2,8 +2,8 @@
 from micropython import const
 import asyncio, time, machine, gc
 
-from utils import get_next_prayer        # async -> returns (prayer_name:str, prayer_time:"HH:MM")
-from cast import Chromecast
+from bilalcast.utils import get_next_prayer        # async -> returns (prayer_name:str, prayer_time:"HH:MM")
+from bilalcast.cast import Chromecast
 
 # ---------- small helpers ----------
 GUARD_MS = const(250)  # wake this many ms before the minute

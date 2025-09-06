@@ -52,15 +52,11 @@ ADD bilalcast modules/bilalcast
 # Create a tiny frozen main.py that runs your bilalcast.main on boot
 RUN printf '%s\n' \
 "try:" \
-"    import www_fs" \
+"    import www_fs  # mounts /www if present" \
 "except Exception:" \
 "    pass" \
-"try:" \
-"    from bilalcast.main import main as _main" \
-"    _main()" \
-"except Exception:" \
-"    import bilalcast.main  # noqa: F401" \
-> modules/main.py                           
+"import bilalcast.main" \
+> modules/main.py                        
 
 # --- (Optional) Freeze your web assets as a compressed VFS -------------------
 # If your HTML/CSS/JS/images live at src/www, pack them into /www (read-only)

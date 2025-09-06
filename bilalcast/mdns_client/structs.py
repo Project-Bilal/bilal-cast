@@ -2,8 +2,8 @@ import time
 from collections import namedtuple
 from struct import pack_into, unpack_from
 
-from mdns_client.constants import FLAGS_QR_QUERY, FLAGS_QR_RESPONSE
-from mdns_client.util import (
+from bilalcast.mdns_client.constants import FLAGS_QR_QUERY, FLAGS_QR_RESPONSE
+from bilalcast.mdns_client.util import (
     byte_count_of_lists,
     bytes_to_name,
     check_name,

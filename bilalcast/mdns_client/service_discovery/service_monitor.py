@@ -1,4 +1,4 @@
-from mdns_client.service_discovery.service_response import ServiceResponse
+from bilalcast.mdns_client.service_discovery.service_response import ServiceResponse
 
 
 class ServiceMonitor:

@@ -1,5 +1,5 @@
-import asyncio
-import time
+import uasyncio as asyncio
+import utime as time
 import os
 import gc
 import ujson as json
@@ -28,6 +28,7 @@ class AsyncConfigStore:
                 return
             except Exception:
                 if time.ticks_diff(time.ticks_ms(), start) > self._timeout_ms:
+                    os.rmdir(self._lock_path)
                     raise OSError("Config lock timeout")
                 await asyncio.sleep_ms(self._retry_ms)
 

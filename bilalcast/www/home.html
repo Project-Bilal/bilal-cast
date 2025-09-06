@@ -1235,32 +1235,26 @@
           const minutes = +snap.remMinutes; // 0..30 from dropdown, 0 = off
           const P = {
             Fajr: {
-              enabled: true,
               volume: snap.fajrVol,
               file: snap.fajrFile,
             },
             Dhuhr: {
-              enabled: true,
               volume: snap.athanVol,
               file: snap.athanFile,
             },
             Asr: {
-              enabled: true,
               volume: snap.athanVol,
               file: snap.athanFile,
             },
             Maghrib: {
-              enabled: true,
               volume: snap.athanVol,
               file: snap.athanFile,
             },
             Isha: {
-              enabled: true,
               volume: snap.athanVol,
               file: snap.athanFile,
             },
             reminder: {
-              enabled: minutes > 0,
               volume: snap.athanVol, // reminder follows athan volume
               file: snap.remFile,
               minutes,
@@ -1386,8 +1380,6 @@
         });
 
         /* iOS install nudge */
-        const INSTALL_KEY = "install_nudge_dismissed_at",
-          INSTALL_COOLDOWN_DAYS = 14;
         function isStandalone() {
           return (
             (window.matchMedia &&
@@ -1398,25 +1390,11 @@
         function isIOS() {
           return /iphone|ipad|ipod/i.test(navigator.userAgent || "");
         }
-        function daysSince(ts) {
-          return (Date.now() - ts) / 86400000;
-        }
         function shouldShowInstallNudge() {
           if (!isIOS() || isStandalone()) return false;
-          try {
-            const ts = +localStorage.getItem(INSTALL_KEY);
-            return Number.isFinite(ts)
-              ? daysSince(ts) >= INSTALL_COOLDOWN_DAYS
-              : true;
-          } catch {
-            return true;
-          }
+          return true;
         }
-        function rememberInstallDismiss() {
-          try {
-            localStorage.setItem(INSTALL_KEY, String(Date.now()));
-          } catch {}
-        }
+        
         function showInstallNudge() {
           const el = $("installNudge");
           if (el) el.style.display = "flex";
@@ -1439,17 +1417,14 @@
             hideInstallNudge();
             showInstallModal();
           });
-          $("installLaterBtn").addEventListener("click", () => {
-            rememberInstallDismiss();
+          $("installLaterBtn").addEventListener("click", () => {  
             hideInstallNudge();
           });
           $("installCloseBtn").addEventListener("click", () => {
-            rememberInstallDismiss();
             hideInstallModal();
           });
           m.addEventListener("click", (e) => {
             if (e.target.hasAttribute("data-close")) {
-              rememberInstallDismiss();
               hideInstallModal();
             }
           });

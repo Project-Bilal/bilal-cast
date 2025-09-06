@@ -1,12 +1,12 @@
 # main.py
-from bilal_server import bilal_server  
+from bilalcast.bilal_server import bilal_server  
 import uasyncio as asyncio
 import ujson as json
 import uos as os
 
-from phew import connect_to_wifi, is_connected_to_wifi
-from captive_portal import captive_portal
-from utils import WIFI_FILE, disconnect_wifi, set_rtc
+from bilalcast.phew import connect_to_wifi, is_connected_to_wifi
+from bilalcast.captive_portal import captive_portal
+from bilalcast.utils import WIFI_FILE, disconnect_wifi, set_rtc
 
 
 async def main():    

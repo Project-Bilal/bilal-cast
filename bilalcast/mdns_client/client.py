@@ -6,10 +6,10 @@ from select import select
 
 import uasyncio
 
-from mdns_client.constants import CLASS_IN, LOCAL_MDNS_SUFFIX, MAX_PACKET_SIZE, MDNS_ADDR, MDNS_PORT, TYPE_A
-from mdns_client.parser import parse_packet
-from mdns_client.structs import DNSQuestion, DNSQuestionWrapper, DNSRecord, DNSResponse
-from mdns_client.util import a_record_rdata_to_string, dotted_ip_to_bytes, set_after_timeout
+from bilalcast.mdns_client.constants import CLASS_IN, LOCAL_MDNS_SUFFIX, MAX_PACKET_SIZE, MDNS_ADDR, MDNS_PORT, TYPE_A
+from bilalcast.mdns_client.parser import parse_packet
+from bilalcast.mdns_client.structs import DNSQuestion, DNSQuestionWrapper, DNSRecord, DNSResponse
+from bilalcast.mdns_client.util import a_record_rdata_to_string, dotted_ip_to_bytes, set_after_timeout
 
 
 class Callback(namedtuple("Callback", ["id", "callback", "remove_if", "timeout", "created_ticks"])):

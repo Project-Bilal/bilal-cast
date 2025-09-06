@@ -4,11 +4,11 @@ import time
 
 import uasyncio
 
-from mdns_client.client import Client
-from mdns_client.constants import CLASS_IN, TYPE_A, TYPE_PTR, TYPE_SRV
-from mdns_client.service_discovery.service_response import ServiceResponse
-from mdns_client.structs import DNSQuestion, DNSRecord, DNSResponse, ServiceProtocol, SRVRecord
-from mdns_client.util import a_record_rdata_to_string, bytes_to_name_list, name_list_to_name
+from bilalcast.mdns_client.client import Client
+from bilalcast.mdns_client.constants import CLASS_IN, TYPE_A, TYPE_PTR, TYPE_SRV
+from bilalcast.mdns_client.service_discovery.service_response import ServiceResponse
+from bilalcast.mdns_client.structs import DNSQuestion, DNSRecord, DNSResponse, ServiceProtocol, SRVRecord
+from bilalcast.mdns_client.util import a_record_rdata_to_string, bytes_to_name_list, name_list_to_name
 
 
 record_buffer = namedtuple("RecordBuffer", ["record", "invalid_at"])
