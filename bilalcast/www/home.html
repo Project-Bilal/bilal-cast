@@ -1059,10 +1059,14 @@
             $("testDeviceWarning").style.display = "none";
 
             const snap = snapshotFromSettings(s);
-            $("vol-fajr").value = snap.fajrVol;
-            $("out-fajr").textContent = `${(snap.fajrVol * 100).toFixed(0)}%`;
-            $("vol-athan").value = snap.athanVol;
-            $("out-athan").textContent = `${(snap.athanVol * 100).toFixed(0)}%`;
+            $("vol-fajr").value = snap.fajrVol || 0.7;
+            $("out-fajr").textContent = `${
+              snap.fajrVol ? (snap.fajrVol * 100).toFixed(0) : 70
+            }%`;
+            $("vol-athan").value = snap.athanVol || 0.7;
+            $("out-athan").textContent = `${
+              snap.athanVol ? (snap.athanVol * 100).toFixed(0) : 70
+            }%`;
             $("file-fajr").value = snap.fajrFile;
             $("file-athan").value = snap.athanFile;
             $("file-rem").value = snap.remFile;
@@ -1394,7 +1398,7 @@
           if (!isIOS() || isStandalone()) return false;
           return true;
         }
-        
+
         function showInstallNudge() {
           const el = $("installNudge");
           if (el) el.style.display = "flex";
@@ -1417,7 +1421,7 @@
             hideInstallNudge();
             showInstallModal();
           });
-          $("installLaterBtn").addEventListener("click", () => {  
+          $("installLaterBtn").addEventListener("click", () => {
             hideInstallNudge();
           });
           $("installCloseBtn").addEventListener("click", () => {
