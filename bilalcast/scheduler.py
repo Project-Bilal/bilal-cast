@@ -69,7 +69,7 @@ async def cast(settings):
 
     # Reminder (global)
     r_cfg        = prayers.get("reminder") or {}
-    r_enabled    = bool(r_cfg.get("enabled") and (r_cfg.get("minutes") or 0) > 0)
+    r_enabled    = bool((r_cfg.get("minutes") or 0) > 0)
     r_minutes    = int(r_cfg.get("minutes") or 0)
     r_url        = r_cfg.get("file")
     # default reminder volume to the prayer's volume if not set

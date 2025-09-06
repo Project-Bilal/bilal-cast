@@ -15,7 +15,6 @@ async def main():
         with open(WIFI_FILE) as f:
             wifi_credentials = json.load(f)
             ip_address = connect_to_wifi(wifi_credentials["ssid"], wifi_credentials["password"])
-            print("setting rtc: ", set_rtc())
             print(f"Connected to wifi, IP address {ip_address}")
             if not is_connected_to_wifi():
                 print("disconnecting wifi")
