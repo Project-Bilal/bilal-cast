@@ -1,15 +1,11 @@
-
-from bilalcast.scheduler import play
-
-
 async def bilal_server():
     import uasyncio as asyncio
     import ujson as json
+    
     from bilalcast.phew import server, get_ip_address
-
     from bilalcast.device_registry import DeviceRegistry
     from bilalcast.store import AsyncConfigStore
-    from bilalcast.scheduler import restart_athan
+    from bilalcast.scheduler import restart_athan, play
     from bilalcast.utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
 
     store = AsyncConfigStore(CONFIG_FILE)
@@ -25,22 +21,18 @@ async def bilal_server():
         return body, status, headers
 
     @app.route("/", methods=["GET"])
-    def app_index(r):
+    def app_home(r):
         return app.serve_file("www/home.html")
     
-    @app.route("/api/devices/refresh", methods=["GET", "POST"])
-    def refresh_devices(r):
-        asyncio.create_task(device_registry.ensure_scan(force=True))
-        return _json(device_registry.snapshot())
-    
-    @app.route("/api/devices", methods=["GET", "POST"])
-    def get_devices(r):
+    @app.route("/api/devices/<force>", methods=["GET", "POST"])
+    def get_devices(r, force):
+        force = force == 'refresh'
         asyncio.create_task(device_registry.ensure_scan(force=False))        
         return _json(device_registry.snapshot())
     
     @app.route("/api/cast/test", methods=["POST"])
     def test_cast(r):
-        asyncio.create_task(play(r.data.get('file', 'ding.mp3'), r.data['host'], r.data['port'], r.data.get('volume', 7)))
+        asyncio.create_task(play(r.data.get('file') or 'ding.mp3', r.data['host'], r.data['port'], r.data.get('volume', 7)))
         return "ok", 200, "text/html"
     
     @app.route("/api/wifi/disconnect", methods=["POST", "GET"])
@@ -55,19 +47,22 @@ async def bilal_server():
     @app.route("/api/settings", methods=["PUT"])
     async def put_settings(r):
         await store.write_all(r.data)
-        # Restart athan in the background (non-blocking for the HTTP handler)
         asyncio.create_task(restart_athan(store))
         return "ok", 200
 
+
+    @app.route("/favicon.ico", methods=["GET"])
+    def favicon(r):
+        return app.serve_file("www/icon.png")
+    
     @app.route("/icons/icon-192.png", methods=["GET"])
     def icon_192(r):
-        #TODO add icon
         return app.serve_file("www/icon.png")
     
     @app.route("/icons/icon-512.png", methods=["GET"])
     def icon_512(r):
-        #TODO add icon
         return app.serve_file("www/icon.png")
+        
     
     @app.route("/manifest.webmanifest", methods=["GET"])
     def web_manifest(r):

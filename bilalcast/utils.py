@@ -37,7 +37,7 @@ def set_rtc(retries=3, delay_ms=500):
             return True
 
         except Exception:
-            pass
+            machine.reset()
         finally:
             try:
                 if r: r.close()

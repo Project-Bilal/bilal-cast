@@ -32,7 +32,12 @@ def urldecode(text):
 def _parse_query_string(query_string):
   result = {}
   for parameter in query_string.split("&"):
-    key, value = parameter.split("=", 1)
+    if not parameter:
+      continue
+    if "=" in parameter:
+      key, value = parameter.split("=", 1)
+    else:
+      key, value = parameter, ""
     key = urldecode(key)
     value = urldecode(value)
     result[key] = value
@@ -47,6 +52,21 @@ class Request:
     self.form = {}
     self.data = {}
     self.query = {}
+    self.headers = {}
+
+    # --- NEW: endpoint info populated by the server in _handle_request ---
+    self.client_addr = None      # (ip, port) of the remote peer
+    self.server_addr = None      # (ip, port) local socket
+    self.remote_addr = None      # ip string of caller
+    self.remote_port = None      # int port of caller
+    self.local_addr = None       # ip string bound locally
+    self.local_port = None       # int local port
+
+    # --- NEW: parsed Host header (what the client addressed us as) ---
+    self.host = None             # raw Host header, e.g. "pico.lan:80"
+    self.host_name = None        # e.g. "pico.lan" or "192.168.1.50"
+    self.host_port = None        # e.g. 80
+
     query_string_start = uri.find("?") if uri.find("?") != -1 else len(uri)
     self.path = uri[:query_string_start]
     self.query_string = uri[query_string_start + 1:]
@@ -56,6 +76,10 @@ class Request:
   def __str__(self):
     return f"""\nrequest: {self.method} {self.path} {self.protocol}
 headers: {self.headers}
+remote: {self.remote_addr}:{self.remote_port}
+local: {self.local_addr}:{self.local_port}
+host: {self.host}
+port: {self.remote_port}
 form: {self.form}
 data: {self.data}"""
 
@@ -217,6 +241,51 @@ status_message_map = {
   500: "Internal Server Error", 501: "Not Implemented"
 }
 
+
+# --- NEW: helper to get remote/local endpoints from the streams/socket ---
+def _get_endpoints(reader, writer):
+  """
+  Returns (peer, local) where each is a (ip, port) tuple or (None, None).
+  Tries uasyncio's get_extra_info first, then falls back to socket attrs.
+  """
+  peer = (None, None)
+  local = (None, None)
+
+  gi = getattr(writer, "get_extra_info", None)
+  if gi:
+    try:
+      p = gi("peername")
+      if p: peer = p
+    except: pass
+    try:
+      l = gi("sockname")
+      if l: local = l
+    except: pass
+    # Some builds expose the socket itself
+    try:
+      s = gi("socket")
+      if s:
+        if peer == (None, None):
+          try: peer = s.getpeername()
+          except: pass
+        if local == (None, None):
+          try: local = s.getsockname()
+          except: pass
+    except: pass
+  else:
+    # Fallback for older uasyncio builds with private attrs
+    for attr in ("_sock", "s", "sock", "_socket"):
+      s = getattr(writer, attr, None) or getattr(reader, attr, None)
+      if s:
+        try: peer = s.getpeername()
+        except: pass
+        try: local = s.getsockname()
+        except: pass
+        break
+
+  return peer, local
+
+
 class Session:
 
   '''
@@ -263,8 +332,36 @@ class Phew:
       logging.error(e)
       return
 
+    # --- NEW: capture client/server endpoints as early as possible ---
+    peer, local = _get_endpoints(reader, writer)
+
     request = Request(method, uri, protocol)
+
+    # --- NEW: attach endpoints to Request ---
+    request.client_addr = peer
+    request.server_addr = local
+    if peer and len(peer) >= 2:
+      request.remote_addr, request.remote_port = peer[0], peer[1]
+    if local and len(local) >= 2:
+      request.local_addr, request.local_port = local[0], local[1]
+
     request.headers = await _parse_headers(reader)
+
+    # --- NEW: parse Host header into host_name/host_port ---
+    h = request.headers.get("host")
+    if h:
+      request.host = h
+      if ":" in h:
+        host_name, host_port = h.rsplit(":", 1)
+        request.host_name = host_name
+        try:
+          request.host_port = int(host_port)
+        except:
+          request.host_port = None
+      else:
+        request.host_name = h
+        request.host_port = None
+
     if "content-length" in request.headers and "content-type" in request.headers:
       if request.headers["content-type"].startswith("multipart/form-data"):
         request.form = await _parse_form_data(reader, request.headers)
@@ -274,11 +371,11 @@ class Phew:
         form_data = b""
         content_length = int(request.headers["content-length"])
         while content_length > 0:
-            data = await reader.read(content_length)
-            if len(data) == 0:
-              break
-            content_length -= len(data)
-            form_data += data
+          data = await reader.read(content_length)
+          if len(data) == 0:
+            break
+          content_length -= len(data)
+          form_data += data
         request.form = _parse_query_string(form_data.decode())
 
     route = self._match_route(request)
@@ -441,14 +538,15 @@ class Phew:
     value = None
     if "cookie" in request.headers:
       cookie = request.headers["cookie"]
-      if cookie:
-        name, value = cookie.split("=")
+      if cookie and "=" in cookie:
+        name, value = cookie.split("=", 1)
       if name == "sessionid":
         # find session
         for s in self.sessions:
           if s.session_id == value:
             session = s
     return session
+
   def remove_session(self, request):
     session = self.get_session(request)
     if session is not None:

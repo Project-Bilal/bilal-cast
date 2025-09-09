@@ -623,9 +623,9 @@
       <div class="backdrop" data-close></div>
       <div class="dialog">
         <div class="row">
-          <strong id="instTitle">Install Bilal Cast on your iPhone/iPad</strong>
+          <strong id="instTitle">Install Bilal Cast</strong>
           <div class="spacer"></div>
-          <button id="installCloseBtn" class="btn ghost">Close</button>
+          <button id="installCloseBtn" class="btn ghost">X</button>
         </div>
         <ol class="steps">
           <li class="step">
@@ -723,7 +723,7 @@
       (() => {
         const API = {
           settings: "/api/settings",
-          devices: "/api/devices",
+          devices: "/api/devices/status",
           devicesRefresh: "/api/devices/refresh",
           castTest: "/api/cast/test",
           wifiDisconnect: "/api/wifi/disconnect",

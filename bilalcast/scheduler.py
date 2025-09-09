@@ -38,32 +38,28 @@ async def play(file, host, port, volume=None):
 
 # ---------- core casting ----------
 async def cast(settings):
-    cd   = settings.get("cast_device") or {}
-    host = cd.get("host")
-    port = cd.get("port")
-
-    if not host:
-        return False
+    cd   = settings["cast_device"]
+    host = cd["host"]
+    port = cd["port"]
 
     # Ask API for the next prayer
     prayer_tuple = await get_next_prayer(
-        method=settings.get("method"),
-        school=settings.get("school"),
-        locationMode=settings.get("locationMode"),
-        latitudeAdjustmentMethod=settings.get("latitudeAdjustmentMethod"),
-        address=settings.get("address"),
-        latitude=settings.get("latitude"),
-        longitude=settings.get("longitude"),
+        method=settings["method"],
+        school=settings["school"],
+        locationMode=settings["locationMode"],
+        latitudeAdjustmentMethod=settings["latitudeAdjustmentMethod"],
+        address=settings["address"],
+        latitude=settings["latitude"],
+        longitude=settings["longitude"],
     )
     if not prayer_tuple:
         return False
 
     prayer_name, prayer_time = prayer_tuple  # e.g. ("Fajr", "05:12")
-    prayers = settings.get("prayers") or {}
-    p_cfg   = prayers.get(prayer_name) or {}
+    prayers = settings["prayers"]
+    p_cfg   = prayers[prayer_name]
 
     # Main (per-prayer) audio
-    main_enabled = p_cfg.get("enabled", True)
     main_url     = p_cfg.get("file")
     main_vol     = p_cfg.get("volume", None)
 
@@ -102,19 +98,10 @@ async def cast(settings):
             machine.reset()
 
         if now == tgt:
-            if main_enabled:
-                await play(main_url, host, port, main_vol)
-                await asyncio.sleep(200)
-                machine.reset()
-            else:
-                # if nothing was scheduled at all, move on after the slot
-                if not r_enabled:
-                    machine.reset()
-
-        # safety: advance even when both were skipped (reset 1 min after tgt)
-        if now == ((tgt + 1) % 1440):
+            await play(main_url, host, port, main_vol)
+            await asyncio.sleep(200)
             machine.reset()
-
+        
         gc.collect()
 
 # ---------- Athan scheduler ----------
