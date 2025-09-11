@@ -10,8 +10,10 @@ except ImportError:
     from bilalcast.cast import Chromecast
 
 # ---------- small helpers ----------
-GUARD_MS = const(250)  # wake this many ms before the minute
-POLL_MS = const(20)  # fine-grained wait to hit ss == 0 exactly
+GUARD_MS     = const(250)      # wake this many ms before the minute
+POLL_MS      = const(20)       # fine polling to hit ss == 0
+FEW_MIN_MS   = const(120000)   # "few minutes" before event (2 min)
+MAX_CHUNK_MS = const(600000)   # cap re-check sleeps to 10 min
 
 
 def _hhmm_to_min(s):
@@ -52,14 +54,16 @@ async def play(file, host, port, volume=None):
 
 # ---------- core casting ----------
 async def cast(settings):
-    cd = settings["cast_device"]
+    cd   = settings["cast_device"]
     host = cd["host"]
     port = cd["port"]
+
     # Ask API for the next prayer
-    prayer_tuple = await get_next_prayer(settings)
+    prayer_tuple = await get_next_prayer(settings)  # expected ("Fajr", "05:12")
     if not prayer_tuple:
         return False
-    prayer_name, prayer_time = prayer_tuple  # e.g. ("Fajr", "05:12")
+
+    prayer_name, prayer_time = prayer_tuple
     prayers = settings["prayers"]
     p_cfg = prayers[prayer_name]
 
@@ -68,42 +72,70 @@ async def cast(settings):
     main_vol = p_cfg.get("volume", 0.5)
 
     # Reminder (global)
-    r_cfg = prayers.get("reminder") or {}
+    r_cfg     = prayers.get("reminder") or {}
     r_enabled = bool((r_cfg.get("minutes") or 0) > 0)
     r_minutes = int(r_cfg.get("minutes") or 0)
-    r_url = r_cfg.get("file")
-    # default reminder volume to the prayer's volume if not set
-    r_vol = r_cfg.get("volume", main_vol)
+    r_url     = r_cfg.get("file")
+    r_vol     = r_cfg.get("volume", main_vol)
 
-    tgt = _hhmm_to_min(prayer_time)  # target minute of day
+    # Minutes since midnight
+    tgt = _hhmm_to_min(prayer_time)
     pre = (tgt - r_minutes) % 1440 if r_enabled else -1
 
     while True:
-        # --- coarse sleep: wake just before next minute ---
-        ss = time.localtime()[5]
-        ms_to_min = (60 - ss) * 1000
-        if ms_to_min > GUARD_MS:
-            await asyncio.sleep_ms(ms_to_min - GUARD_MS)
+        # ----- compute time to next event (reminder or main) -----
+        _y,_m,_d, hh, mm, ss, *_ = time.localtime()
+        now = hh * 60 + mm
 
-        # --- fine wait: hit the exact minute boundary (ss == 0) ---
-        while True:
-            if time.localtime()[5] == 0:
-                break
+        d_tgt = (tgt - now) % 1440
+        d_pre = (pre - now) % 1440 if r_enabled else 1 << 30
+
+        # choose sooner non-zero delta
+        delta_min = d_pre if (r_enabled and d_pre and d_pre < d_tgt) else d_tgt
+        
+        ms_to_event = delta_min * 60000 - ss * 1000
+        if ms_to_event < 0:
+            ms_to_event = 0
+
+        # ----- dynamic coarse sleep: wake a few minutes before event -----
+        WAKE_MARGIN_MS = FEW_MIN_MS + GUARD_MS
+        while ms_to_event > WAKE_MARGIN_MS:
+            chunk = ms_to_event - WAKE_MARGIN_MS
+            if chunk > MAX_CHUNK_MS:
+                chunk = MAX_CHUNK_MS
+            await asyncio.sleep_ms(chunk)
+
+            # recompute remaining time
+            _y,_m,_d, hh, mm, ss, *_ = time.localtime()
+            now = hh * 60 + mm
+            d_tgt = (tgt - now) % 1440
+            d_pre = (pre - now) % 1440 if r_enabled else 1 << 30
+            delta_min = d_pre if (r_enabled and d_pre and d_pre < d_tgt) else d_tgt
+            ms_to_event = delta_min * 60000 - ss * 1000
+            if ms_to_event < 0:
+                ms_to_event = 0
+            gc.collect()
+
+        # sleep until just before the minute boundary
+        if ms_to_event > GUARD_MS:
+            await asyncio.sleep_ms(ms_to_event - GUARD_MS)
+
+        # fine poll to hit ss == 0 exactly
+        while time.localtime()[5] != 0:
             await asyncio.sleep_ms(POLL_MS)
 
-        # --- top of minute ---
-        _y, _m, _d, hh, mm, _ss, *_ = time.localtime()
+        # ----- top of minute: fire if match -----
+        _y,_m,_d, hh, mm, _ss, *_ = time.localtime()
         now = hh * 60 + mm
 
         if r_enabled and now == pre:
             await play(r_url, host, port, r_vol)
-            # let it play a bit, then reset to re-fetch next prayer
-            await asyncio.sleep(100)
+            await asyncio.sleep(60)  # let it play
             machine.reset()
 
         if now == tgt:
             await play(main_url, host, port, main_vol)
-            await asyncio.sleep(200)
+            await asyncio.sleep(60)
             machine.reset()
 
         gc.collect()
@@ -146,16 +178,12 @@ async def restart_athan(store):
     global _athan_task
     async with _restart_lock:
         if _athan_task is not None:
-            # Cancel and await to let it process CancelledError
             _athan_task.cancel()
             try:
                 await _athan_task
             except asyncio.CancelledError:
                 pass
             _athan_task = None
-
-        # Start fresh in the background (do NOT return it to be awaited by callers)
-        print("re-starting athan")
         _athan_task = asyncio.create_task(athan_scheduler(store))
 
 

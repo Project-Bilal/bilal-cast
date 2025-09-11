@@ -45,6 +45,7 @@ async def bilal_server():
 
     @app.route("/api/devices/<force>", methods=["GET", "POST"])
     def get_devices(r, force):
+        print("get_devices", force)
         force = force == "refresh"
         asyncio.create_task(device_registry.ensure_scan(force=force))
         return _json(device_registry.snapshot())
