@@ -10,46 +10,46 @@ async def disconnect_wifi(wifi_file):
     machine.reset()
 
 
-def set_rtc(retries=3, delay_ms=500):
+async def set_rtc(retries=3, delay_ms=500):
+    # MicroPython-friendly imports
+    import utime as time            # pyright: ignore[reportMissingImports]
+    import machine, gc              # pyright: ignore[reportMissingImports]
     import urequests as requests  # pyright: ignore[reportMissingImports]
-    import utime as time  # pyright: ignore[reportMissingImports]
-    import machine, gc  # pyright: ignore[reportMissingImports]
+    import uasyncio as asyncio  # pyright: ignore[reportMissingImports]
+
 
     URL = "https://worldtimeapi.org/api/timezone/utc.txt"
 
     for _ in range(retries):
         r = None
         try:
-            r = requests.get(URL)
+            r = requests.get(URL)          # blocking; keep call brief
             txt = r.text
-            # Look for the utc_datetime line
-            t = None
+
+            # Parse "unixtime: 1756971434" (fastest way to get full UTC date+time+weekday)
+            unixtime = None
             for line in txt.split("\n"):
-                if line.startswith("utc_datetime:"):
-                    # slice out HH:MM:SS from e.g. 2025-09-04T07:37:14.513231+00:00
-                    t = line[line.find("T") + 1 : line.find("T") + 9]
+                if line.startswith("unixtime:"):
+                    unixtime = int(line.split(":", 1)[1].strip())
                     break
-            if not t:
-                raise ValueError("No utc_datetime found")
 
-            hh, mm, ss = [int(x) for x in t.split(":")]
-
-            rtc = machine.RTC()
-            y, m, d, wd, H, M, S, sub = rtc.datetime()
-            rtc.datetime((y, m, d, wd, hh, mm, ss, 0))
+            y, m, d, H, M, S, wd, _ = time.gmtime(unixtime)
+            machine.RTC().datetime((y, m, d, wd, H, M, S, 0))
             return True
 
-        except Exception:
-            machine.reset()
+        except Exception as e:
+            # Log and retry; don't hard-reset the board from a helper
+            print("RTC set error:", e)
         finally:
             try:
-                if r:
-                    r.close()
-            except:
+                if r: r.close()            # always free the socket on MicroPython
+            except: 
                 pass
             gc.collect()
-            time.sleep_ms(delay_ms)
+            await asyncio.sleep_ms(delay_ms)  # yield back to the loop
+
     return False
+
 
 
 def url_encode(s):
@@ -72,7 +72,6 @@ def get_pre_time(t, offset=10):
 
 async def fetch_with_retry(url, retries=5, delay_ms=2000):
     import urequests as requests, uasyncio as asyncio, gc, json  # pyright: ignore[reportMissingImports]
-
     while retries:
         try:
             r = requests.get(url)

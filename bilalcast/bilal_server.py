@@ -3,19 +3,19 @@ async def bilal_server():
     import ujson as json  # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 
     try:  # support for local development with local files
-        from bilalcast.phew import server, get_ip_address
-        from bilalcast.device_registry import DeviceRegistry
-        from bilalcast.store import AsyncConfigStore
-        from bilalcast.scheduler import restart_athan, play
-        from bilalcast.utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
-        from bilalcast import led_status
-    except ImportError:
         from phew import server, get_ip_address
         from device_registry import DeviceRegistry
         from store import AsyncConfigStore
         from scheduler import restart_athan, play
         from utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
         import led_status
+    except ImportError:
+        from bilalcast.phew import server, get_ip_address
+        from bilalcast.device_registry import DeviceRegistry
+        from bilalcast.store import AsyncConfigStore
+        from bilalcast.scheduler import restart_athan, play
+        from bilalcast.utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
+        from bilalcast import led_status
 
     store = AsyncConfigStore(CONFIG_FILE)
     configs = await store.read_all()

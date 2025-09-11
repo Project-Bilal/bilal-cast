@@ -17,11 +17,11 @@ async def captive_portal():
     import machine, time  # pyright: ignore[reportMissingImports]
 
     try:  # support for local development with local files
-        from bilalcast.phew import dns, access_point, server
-        from bilalcast.phew.template import render_template
-    except ImportError:
         from phew import dns, access_point, server
         from phew.template import render_template
+    except ImportError:
+        from bilalcast.phew import dns, access_point, server
+        from bilalcast.phew.template import render_template
 
     app = server.Phew()
 

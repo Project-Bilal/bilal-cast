@@ -3,11 +3,11 @@ from micropython import const  # pyright: ignore[reportMissingImports]
 import asyncio, time, machine, gc  # pyright: ignore[reportMissingImports]
 
 try:  # support for local development with local files
-    from bilalcast.utils import get_next_prayer  # async -> returns (prayer_name:str, prayer_time:"HH:MM")
-    from bilalcast.cast import Chromecast
-except ImportError:
     from utils import get_next_prayer  # async -> returns (prayer_name:str, prayer_time:"HH:MM")
     from cast import Chromecast
+except ImportError:
+    from bilalcast.utils import get_next_prayer  # async -> returns (prayer_name:str, prayer_time:"HH:MM")
+    from bilalcast.cast import Chromecast
 
 # ---------- small helpers ----------
 GUARD_MS = const(250)  # wake this many ms before the minute
@@ -55,7 +55,6 @@ async def cast(settings):
     cd = settings["cast_device"]
     host = cd["host"]
     port = cd["port"]
-
     # Ask API for the next prayer
     prayer_tuple = await get_next_prayer(
         method=settings.get("method"),
@@ -68,7 +67,6 @@ async def cast(settings):
     )
     if not prayer_tuple:
         return False
-
     prayer_name, prayer_time = prayer_tuple  # e.g. ("Fajr", "05:12")
     prayers = settings["prayers"]
     p_cfg = prayers[prayer_name]
