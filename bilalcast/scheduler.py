@@ -1,17 +1,23 @@
 # athan_scheduler.py
-from micropython import const
-import asyncio, time, machine, gc
+from micropython import const  # pyright: ignore[reportMissingImports]
+import asyncio, time, machine, gc  # pyright: ignore[reportMissingImports]
 
-from bilalcast.utils import get_next_prayer        # async -> returns (prayer_name:str, prayer_time:"HH:MM")
-from bilalcast.cast import Chromecast
+try:  # support for local development with local files
+    from bilalcast.utils import get_next_prayer  # async -> returns (prayer_name:str, prayer_time:"HH:MM")
+    from bilalcast.cast import Chromecast
+except ImportError:
+    from utils import get_next_prayer  # async -> returns (prayer_name:str, prayer_time:"HH:MM")
+    from cast import Chromecast
 
 # ---------- small helpers ----------
 GUARD_MS = const(250)  # wake this many ms before the minute
-POLL_MS  = const(20)   # fine-grained wait to hit ss == 0 exactly
+POLL_MS = const(20)  # fine-grained wait to hit ss == 0 exactly
+
 
 def _hhmm_to_min(s):
     # s like "HH:MM"
     return int(s[:2]) * 60 + int(s[3:5])
+
 
 def _file_url(name):
     base = "https://storage.googleapis.com/athans/"
@@ -21,6 +27,7 @@ def _file_url(name):
     if name.startswith("http://") or name.startswith("https://"):
         return name
     return base + name
+
 
 async def play(file, host, port, volume=None):
     file_url = _file_url(file)
@@ -36,9 +43,10 @@ async def play(file, host, port, volume=None):
         return False
     return True
 
+
 # ---------- core casting ----------
 async def cast(settings):
-    cd   = settings["cast_device"]
+    cd = settings["cast_device"]
     host = cd["host"]
     port = cd["port"]
 
@@ -57,21 +65,21 @@ async def cast(settings):
 
     prayer_name, prayer_time = prayer_tuple  # e.g. ("Fajr", "05:12")
     prayers = settings["prayers"]
-    p_cfg   = prayers[prayer_name]
+    p_cfg = prayers[prayer_name]
 
     # Main (per-prayer) audio
-    main_url     = p_cfg.get("file")
-    main_vol     = p_cfg.get("volume", None)
+    main_url = p_cfg.get("file")
+    main_vol = p_cfg.get("volume", None)
 
     # Reminder (global)
-    r_cfg        = prayers.get("reminder") or {}
-    r_enabled    = bool((r_cfg.get("minutes") or 0) > 0)
-    r_minutes    = int(r_cfg.get("minutes") or 0)
-    r_url        = r_cfg.get("file")
+    r_cfg = prayers.get("reminder") or {}
+    r_enabled = bool((r_cfg.get("minutes") or 0) > 0)
+    r_minutes = int(r_cfg.get("minutes") or 0)
+    r_url = r_cfg.get("file")
     # default reminder volume to the prayer's volume if not set
-    r_vol        = r_cfg.get("volume", main_vol)
+    r_vol = r_cfg.get("volume", main_vol)
 
-    tgt = _hhmm_to_min(prayer_time)                # target minute of day
+    tgt = _hhmm_to_min(prayer_time)  # target minute of day
     pre = (tgt - r_minutes) % 1440 if r_enabled else -1
 
     while True:
@@ -101,13 +109,15 @@ async def cast(settings):
             await play(main_url, host, port, main_vol)
             await asyncio.sleep(200)
             machine.reset()
-        
+
         gc.collect()
+
 
 # ---------- Athan scheduler ----------
 # One global handle to the scheduler task
 _athan_task = None
 _restart_lock = asyncio.Lock()
+
 
 async def athan_scheduler(store):
     """
@@ -127,12 +137,14 @@ async def athan_scheduler(store):
         # Optional: log unexpected errors so the task doesn't silently die
         print("athan_scheduler error:", e)
 
+
 async def _wait_for_settings(store):
     while True:
         settings = await store.read_all()
         if settings:
             return settings
         await asyncio.sleep_ms(200)
+
 
 async def restart_athan(store):
     """
@@ -153,6 +165,7 @@ async def restart_athan(store):
         # Start fresh in the background (do NOT return it to be awaited by callers)
         print("re-starting athan")
         _athan_task = asyncio.create_task(athan_scheduler(store))
+
 
 def get_athan_task():
     return _athan_task

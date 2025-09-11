@@ -5,11 +5,12 @@ import gc
 
 THUMB = b"https://storage.googleapis.com/athans/athan_logo.png"
 
-_SRC  = b"sender-0"
+_SRC = b"sender-0"
 _RECV = b"receiver-0"
-_NS_CONN  = b"urn:x-cast:com.google.cast.tp.connection"
-_NS_RECV  = b"urn:x-cast:com.google.cast.receiver"
+_NS_CONN = b"urn:x-cast:com.google.cast.tp.connection"
+_NS_RECV = b"urn:x-cast:com.google.cast.receiver"
 _NS_MEDIA = b"urn:x-cast:com.google.cast.media"
+
 
 def _varint(n):
     """Minimal protobuf varint encoder (bytes)."""
@@ -19,6 +20,7 @@ def _varint(n):
         n >>= 7
     out.append(n)
     return bytes(out)
+
 
 def _frame(namespace, payload_utf8, dest=_RECV, src=_SRC):
     """
@@ -41,13 +43,22 @@ def _frame(namespace, payload_utf8, dest=_RECV, src=_SRC):
     # Protobuf body
     body = (
         b"\x08\x00"  # protocol_version
-        + b"\x12" + _varint(len(src)) + src
-        + b"\x1a" + _varint(len(dest)) + dest
-        + b"\x22" + _varint(len(namespace)) + namespace
+        + b"\x12"
+        + _varint(len(src))
+        + src
+        + b"\x1a"
+        + _varint(len(dest))
+        + dest
+        + b"\x22"
+        + _varint(len(namespace))
+        + namespace
         + b"\x28\x00"  # payload_type = STRING (0)
-        + b"\x32" + _varint(len(payload_utf8)) + payload_utf8
+        + b"\x32"
+        + _varint(len(payload_utf8))
+        + payload_utf8
     )
     return pack(">I", len(body)) + body
+
 
 class Chromecast(object):
     def __init__(self, cast_ip, cast_port, timeout_s=5):
@@ -60,8 +71,8 @@ class Chromecast(object):
         self._sock.connect((self.ip, cast_port))
         self.s = ssl.wrap_socket(self._sock)
 
-        self._send(_frame(_NS_CONN,  b'{"type":"CONNECT"}'))
-        self._send(_frame(_NS_RECV,  b'{"type":"GET_STATUS","requestId":1}'))
+        self._send(_frame(_NS_CONN, b'{"type":"CONNECT"}'))
+        self._send(_frame(_NS_RECV, b'{"type":"GET_STATUS","requestId":1}'))
 
     def _send(self, data):
         """sendall for SSL sockets (write may be partial)."""
@@ -118,15 +129,13 @@ class Chromecast(object):
         if not transport_id:
             return False
 
-        self._send(_frame(_NS_CONN,  b'{"type":"CONNECT"}', dest=transport_id))
+        self._send(_frame(_NS_CONN, b'{"type":"CONNECT"}', dest=transport_id))
         self._send(_frame(_NS_MEDIA, b'{"type":"GET_STATUS","requestId":4}', dest=transport_id))
 
         load_payload = (
-            b'{"media":{"contentId":"' + url_b +
-            b'","streamType":"BUFFERED","contentType":"audio/mp3","metadata":'
+            b'{"media":{"contentId":"' + url_b + b'","streamType":"BUFFERED","contentType":"audio/mp3","metadata":'
             b'{"metadataType":0,"title":"Bilal Cast","thumb":"' + THUMB + b'","images":[{"url":"' + THUMB + b'"}]}},'
-            b'"type":"LOAD","autoplay":true,"customData":{},"requestId":5,"sessionId":"'
-            + transport_id + b'"}'
+            b'"type":"LOAD","autoplay":true,"customData":{},"requestId":5,"sessionId":"' + transport_id + b'"}'
         )
 
         self._send(_frame(_NS_MEDIA, load_payload, dest=transport_id))
@@ -154,7 +163,7 @@ class Chromecast(object):
             if i != -1:
                 j = msg.find(b'"', i + len(key))
                 if j != -1:
-                    return msg[i + len(key):j]
+                    return msg[i + len(key) : j]
         return None
 
     @staticmethod

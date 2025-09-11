@@ -1,6 +1,6 @@
-import struct
+import struct  # pyright: ignore[reportMissingImports]
 
-import uasyncio
+import uasyncio  # pyright: ignore[reportMissingImports]
 
 from bilalcast.mdns_client.constants import REPEAT_TYPE_FLAG, TYPE_CNAME, TYPE_MX, TYPE_NS, TYPE_PTR, TYPE_SOA, TYPE_SRV
 

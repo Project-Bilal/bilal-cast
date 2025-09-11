@@ -1,8 +1,8 @@
-import uasyncio as asyncio
-import utime as time
+import uasyncio as asyncio  # pyright: ignore[reportMissingImports]
+import utime as time  # pyright: ignore[reportMissingImports]
 import os
 import gc
-import ujson as json
+import ujson as json  # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 
 
 def _fsync_best_effort():
