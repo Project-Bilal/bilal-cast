@@ -12,18 +12,17 @@ async def disconnect_wifi(wifi_file):
 
 async def set_rtc(retries=3, delay_ms=500):
     # MicroPython-friendly imports
-    import utime as time            # pyright: ignore[reportMissingImports]
-    import machine, gc              # pyright: ignore[reportMissingImports]
+    import utime as time  # pyright: ignore[reportMissingImports]
+    import machine, gc  # pyright: ignore[reportMissingImports]
     import urequests as requests  # pyright: ignore[reportMissingImports]
     import uasyncio as asyncio  # pyright: ignore[reportMissingImports]
-
 
     URL = "https://worldtimeapi.org/api/timezone/utc.txt"
 
     for _ in range(retries):
         r = None
         try:
-            r = requests.get(URL)          # blocking; keep call brief
+            r = requests.get(URL)  # blocking; keep call brief
             txt = r.text
 
             # Parse "unixtime: 1756971434" (fastest way to get full UTC date+time+weekday)
@@ -37,19 +36,18 @@ async def set_rtc(retries=3, delay_ms=500):
             machine.RTC().datetime((y, m, d, wd, H, M, S, 0))
             return True
 
-        except Exception as e:
-            # Log and retry; don't hard-reset the board from a helper
-            print("RTC set error:", e)
+        except:
+            pass
         finally:
             try:
-                if r: r.close()            # always free the socket on MicroPython
-            except: 
+                if r:
+                    r.close()  # always free the socket on MicroPython
+            except:
                 pass
             gc.collect()
             await asyncio.sleep_ms(delay_ms)  # yield back to the loop
 
     return False
-
 
 
 def url_encode(s):
@@ -63,15 +61,9 @@ def url_encode(s):
     return "".join(res)
 
 
-def get_pre_time(t, offset=10):
-    h = (ord(t[0]) - 48) * 10 + (ord(t[1]) - 48)
-    m = (ord(t[3]) - 48) * 10 + (ord(t[4]) - 48)
-    mins = (h * 60 + m - offset) % 1440
-    return "%02d:%02d" % (mins // 60, mins % 60)
-
-
 async def fetch_with_retry(url, retries=5, delay_ms=2000):
     import urequests as requests, uasyncio as asyncio, gc, json  # pyright: ignore[reportMissingImports]
+
     while retries:
         try:
             r = requests.get(url)
@@ -89,27 +81,72 @@ async def fetch_with_retry(url, retries=5, delay_ms=2000):
     return None
 
 
-async def get_next_prayer(
-    method=None,
-    school=None,
-    locationMode=None,
-    latitudeAdjustmentMethod=None,
-    address=None,
-    latitude=None,
-    longitude=None,
-):
+async def get_next_prayer(settings):
     import utime as time  # pyright: ignore[reportMissingImports]
 
     y, m, d, *_ = time.localtime()
     base_url = "https://api.aladhan.com/v1/"
     q = None
-    if locationMode == "address":
-        q = "nextPrayerByAddress/%02d-%02d-%04d?timezonestring=UTC&address=%s" % (d, m, y, url_encode(address))
+    if settings["locationMode"] == "address":
+        q = "nextPrayerByAddress/%02d-%02d-%04d?timezonestring=UTC&address=%s" % (
+            d,
+            m,
+            y,
+            url_encode(settings["address"]),
+        )
     else:
-        q = "nextPrayer/%02d-%02d-%04d?timezonestring=UTC&latitude=%s&longitude=%s" % (d, m, y, latitude, longitude)
+        q = "nextPrayer/%02d-%02d-%04d?timezonestring=UTC&latitude=%s&longitude=%s" % (
+            d,
+            m,
+            y,
+            settings["latitude"],
+            settings["longitude"],
+        )
 
-    q += "&method=%s&school=%s&latitudeAdjustmentMethod=%s" % (method or 2, school or 0, latitudeAdjustmentMethod or 3)
+    q += "&method=%s&school=%s&latitudeAdjustmentMethod=%s" % (
+        settings["method"] or 2,
+        settings["school"] or 0,
+        settings["latitudeAdjustmentMethod"] or 3,
+    )
     url = base_url + q
 
     resp = await fetch_with_retry(url)
     return resp["data"]["timings"].popitem() if resp else None
+
+
+def get_wifi_info():
+    try:
+        import network  # pyright: ignore[reportMissingImports]
+
+        sta = network.WLAN(network.STA_IF)
+        if not sta.active() or not sta.isconnected():
+            return None
+        return {
+            "ssid": sta.config("essid"),
+            "rssi_dbm": sta.status("rssi"),  # negative dBm
+        }
+    except Exception:
+        return None
+
+
+def rssi_to_quality(rssi):
+    if rssi is None:
+        return 0
+    if rssi <= -100:
+        return 0
+    if rssi >= -50:
+        return 100
+    return 2 * (rssi + 100)
+
+
+def rssi_to_bars(rssi):
+    q = rssi_to_quality(rssi)
+    if q < 10:
+        return 0
+    if q < 35:
+        return 1
+    if q < 60:
+        return 2
+    if q < 80:
+        return 3
+    return 4

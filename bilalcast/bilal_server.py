@@ -7,14 +7,21 @@ async def bilal_server():
         from device_registry import DeviceRegistry
         from store import AsyncConfigStore
         from scheduler import restart_athan, play
-        from utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
+        from utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE, get_wifi_info, rssi_to_bars, rssi_to_quality
         import led_status
     except ImportError:
         from bilalcast.phew import server, get_ip_address
         from bilalcast.device_registry import DeviceRegistry
         from bilalcast.store import AsyncConfigStore
         from bilalcast.scheduler import restart_athan, play
-        from bilalcast.utils import disconnect_wifi, WIFI_FILE, CONFIG_FILE
+        from bilalcast.utils import (
+            disconnect_wifi,
+            WIFI_FILE,
+            CONFIG_FILE,
+            get_wifi_info,
+            rssi_to_bars,
+            rssi_to_quality,
+        )
         from bilalcast import led_status
 
     store = AsyncConfigStore(CONFIG_FILE)
@@ -39,13 +46,13 @@ async def bilal_server():
     @app.route("/api/devices/<force>", methods=["GET", "POST"])
     def get_devices(r, force):
         force = force == "refresh"
-        asyncio.create_task(device_registry.ensure_scan(force=False))
+        asyncio.create_task(device_registry.ensure_scan(force=force))
         return _json(device_registry.snapshot())
 
     @app.route("/api/cast/test", methods=["POST"])
     def test_cast(r):
         asyncio.create_task(
-            play(r.data.get("file") or "ding.mp3", r.data["host"], r.data["port"], r.data.get("volume", 7))
+            play(r.data.get("file"), r.data["host"], r.data["port"], r.data.get("volume", 7))
         )
         return "ok", 200, "text/html"
 
@@ -65,16 +72,24 @@ async def bilal_server():
         asyncio.create_task(restart_athan(store))
         return "ok", 200
 
-    @app.route("/favicon.ico", methods=["GET"])
-    def favicon(r):
-        return app.serve_file("www/icon.png")
+    @app.route("/api/wifi/signal", methods=["GET"])
+    def wifi_signal(r):
+        info = get_wifi_info()
+        if not info:
+            data = {"connected": False}
+        else:
+            rssi = info["rssi_dbm"]
+            data = {
+                "connected": True,
+                "ssid": info["ssid"],
+                "rssi_dbm": rssi,
+                "quality_pct": rssi_to_quality(rssi),
+                "bars": rssi_to_bars(rssi),
+            }
+        return _json(data)
 
-    @app.route("/icons/icon-192.png", methods=["GET"])
-    def icon_192(r):
-        return app.serve_file("www/icon.png")
-
-    @app.route("/icons/icon-512.png", methods=["GET"])
-    def icon_512(r):
+    @app.route("/icons/icon.png", methods=["GET"])
+    def icon(r):
         return app.serve_file("www/icon.png")
 
     @app.route("/manifest.webmanifest", methods=["GET"])
@@ -90,8 +105,8 @@ async def bilal_server():
             "background_color": "#0b1220",
             "theme_color": "#0b1220",
             "icons": [
-                {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+                {"src": "/icons/icon.png", "sizes": "192x192", "type": "image/png"},
+                {"src": "/icons/icon.png", "sizes": "512x512", "type": "image/png"},
             ],
         }
 

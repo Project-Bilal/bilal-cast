@@ -56,15 +56,7 @@ async def cast(settings):
     host = cd["host"]
     port = cd["port"]
     # Ask API for the next prayer
-    prayer_tuple = await get_next_prayer(
-        method=settings.get("method"),
-        school=settings.get("school"),
-        locationMode=settings.get("locationMode"),
-        latitudeAdjustmentMethod=settings["latitudeAdjustmentMethod"],
-        address=settings.get("address"),
-        latitude=settings.get("latitude"),
-        longitude=settings.get("longitude"),
-    )
+    prayer_tuple = await get_next_prayer(settings)
     if not prayer_tuple:
         return False
     prayer_name, prayer_time = prayer_tuple  # e.g. ("Fajr", "05:12")
@@ -73,7 +65,7 @@ async def cast(settings):
 
     # Main (per-prayer) audio
     main_url = p_cfg.get("file")
-    main_vol = p_cfg.get("volume", None)
+    main_vol = p_cfg.get("volume", 0.5)
 
     # Reminder (global)
     r_cfg = prayers.get("reminder") or {}
