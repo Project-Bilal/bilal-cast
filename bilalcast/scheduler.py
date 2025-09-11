@@ -21,25 +21,31 @@ def _hhmm_to_min(s):
 
 def _file_url(name):
     base = "https://storage.googleapis.com/athans/"
-    if not name:
-        return None
-    # accept absolute URLs, otherwise join with base
-    if name.startswith("http://") or name.startswith("https://"):
+
+    if name.startswith("https://"):
         return name
     return base + name
 
 
 async def play(file, host, port, volume=None):
+    # retry 3 times
     file_url = _file_url(file)
-    try:
-        cast = Chromecast(host, port)
-        cast.set_volume(volume)
-        cast.disconnect()
-        cast = Chromecast(host, port)
-        cast.play_url(file_url)
-        cast.disconnect()
-    except Exception as e:
-        print(e)
+    success = False
+    for _ in range(3):
+        try:
+            cast = Chromecast(host, port)
+            cast.set_volume(volume)
+            cast.disconnect()
+            asyncio.sleep(1)
+            cast = Chromecast(host, port)
+            cast.play_url(file_url)
+            cast.disconnect()
+            success = True
+            break
+        except Exception as e:
+            print(e)
+            asyncio.sleep(1)
+    if not success:
         return False
     return True
 
@@ -52,13 +58,13 @@ async def cast(settings):
 
     # Ask API for the next prayer
     prayer_tuple = await get_next_prayer(
-        method=settings["method"],
-        school=settings["school"],
-        locationMode=settings["locationMode"],
+        method=settings.get("method"),
+        school=settings.get("school"),
+        locationMode=settings.get("locationMode"),
         latitudeAdjustmentMethod=settings["latitudeAdjustmentMethod"],
-        address=settings["address"],
-        latitude=settings["latitude"],
-        longitude=settings["longitude"],
+        address=settings.get("address"),
+        latitude=settings.get("latitude"),
+        longitude=settings.get("longitude"),
     )
     if not prayer_tuple:
         return False
@@ -127,14 +133,10 @@ async def athan_scheduler(store):
     """
     try:
         settings = await _wait_for_settings(store)
-        # Your own function that schedules & plays (not shown here)
         await cast(settings)
     except asyncio.CancelledError:
-        # Do any cleanup you need here (e.g., stop audio, release resources).
-        # Re-raise so the awaiting canceller sees the cancellation.
         raise
     except Exception as e:
-        # Optional: log unexpected errors so the task doesn't silently die
         print("athan_scheduler error:", e)
 
 
