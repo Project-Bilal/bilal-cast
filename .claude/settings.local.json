@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:aladhan.com)",
+      "WebFetch(domain:api.aladhan.com)"
+    ]
+  }
+}
