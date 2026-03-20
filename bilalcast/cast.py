@@ -64,15 +64,21 @@ class Chromecast(object):
     def __init__(self, cast_ip, cast_port, timeout_s=5):
         self.ip = cast_ip
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s = None
         try:
-            self._sock.settimeout(timeout_s)
+            try:
+                self._sock.settimeout(timeout_s)
+            except Exception:
+                pass
+            self._sock.connect((self.ip, cast_port))
+            self.s = ssl.wrap_socket(self._sock)
+            self._send(_frame(_NS_CONN, b'{"type":"CONNECT"}'))
         except Exception:
-            pass
-        self._sock.connect((self.ip, cast_port))
-        self.s = ssl.wrap_socket(self._sock)
-
-        self._send(_frame(_NS_CONN, b'{"type":"CONNECT"}'))
-        self._send(_frame(_NS_RECV, b'{"type":"GET_STATUS","requestId":1}'))
+            try:
+                self._sock.close()
+            except Exception:
+                pass
+            raise
 
     def _send(self, data):
         """sendall for SSL sockets (write may be partial)."""
@@ -88,7 +94,6 @@ class Chromecast(object):
     def _read_exact(self, n):
         """Read exactly n bytes or raise."""
         chunks = bytearray()
-        mv = memoryview(chunks)
         got = 0
         while got < n:
             chunk = self.s.read(n - got)
@@ -123,6 +128,7 @@ class Chromecast(object):
         else:
             url_b = url
 
+        self._send(_frame(_NS_RECV, b'{"type":"STOP","requestId":2}'))
         self._send(_frame(_NS_RECV, b'{"type":"LAUNCH","appId":"CC1AD845","requestId":3}'))
 
         transport_id = self._wait_for_transport_id(timeout_ms=5000)
@@ -130,25 +136,15 @@ class Chromecast(object):
             return False
 
         self._send(_frame(_NS_CONN, b'{"type":"CONNECT"}', dest=transport_id))
-        self._send(_frame(_NS_MEDIA, b'{"type":"GET_STATUS","requestId":4}', dest=transport_id))
 
         load_payload = (
             b'{"media":{"contentId":"' + url_b + b'","streamType":"BUFFERED","contentType":"audio/mp3","metadata":'
             b'{"metadataType":0,"title":"Bilal Cast","thumb":"' + THUMB + b'","images":[{"url":"' + THUMB + b'"}]}},'
-            b'"type":"LOAD","autoplay":true,"customData":{},"requestId":5,"sessionId":"' + transport_id + b'"}'
+            b'"type":"LOAD","autoplay":true,"customData":{},"requestId":4,"sessionId":"' + transport_id + b'"}'
         )
 
         self._send(_frame(_NS_MEDIA, load_payload, dest=transport_id))
-
-        for _ in range(6):
-            try:
-                status = self.read_message()
-            except OSError:
-                break
-            if b'"type":"MEDIA_STATUS"' in status and b'"Bilal Cast"' in status:
-                return True
-
-        return False
+        return True
 
     def _wait_for_transport_id(self, timeout_ms=4000):
         """Wait until any incoming message contains "transportId":"..."""
@@ -182,7 +178,8 @@ class Chromecast(object):
 
     def disconnect(self):
         try:
-            self.s.close()
+            if self.s:
+                self.s.close()
         finally:
             try:
                 self._sock.close()

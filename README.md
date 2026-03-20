@@ -1,33 +1,64 @@
-# Gameplan Overview
-Quick summary of how to approach a working solution using both a device based scheduler and app based onboarding and configurations.
+# Bilal Cast
 
-#### Use Bilal Companion app to onboard device to wifi via bluetooth
-1. Find BilalCast Device using bluetooth
-2. Search for available networks
-3. Select desired network
-4. Submit network ssid and pw to BilalCast Device
-5. Wait for device to come online and very its status.  This can be done by mDNS discovery, or device communicating its status via bluetooth. 
-6. Set BilalCast RTC to UTC using worldtimezone's api (https://worldtimeapi.org/api/timezone/utc.txt)
+Standalone MicroPython app for the Raspberry Pi Pico W that plays the athan (call to prayer) at the correct times by casting MP3s to a Chromecast device.
 
+## How it works
 
-#### Configure BilalCast Device using Companion App
-1. Save BilalCast device's identification on users profile.  
-2. Allow cofiguration options for BilalCast (Location, Calculation methods, athans, volumes, reminders)
-3. Send configuration information to BilalCast device. (via http or bt)
+1. On boot, the device connects to Wi-Fi using saved credentials
+2. Syncs the clock via NTP
+3. Discovers the Chromecast on the local network via mDNS
+4. Detects location automatically via IP geolocation
+5. Fetches the next prayer time from the Aladhan API
+6. Sleeps until the prayer time, then casts the athan audio to the Chromecast
+7. Resets and repeats for the next prayer
 
-#### Trigger Athans
-1. When configurations present start athan scheduler
-2. When configurations updated, restart athan scheduler
-3. Reset after every call
-4. Fetch next prayer using aladhan api.
-5. UTC timezone
+## First-time setup
 
+The device uses a captive portal for onboarding — no app required.
 
-#### General BilalCast Features
-1. online status
-2. wifi disconnect/reset via http/bt
-3. wifi strength
-4. test casting to speaker from device
+1. Power on the Pico W with no config present
+2. It will create a Wi-Fi access point named **"Bilal Cast Onboarding"**
+3. Connect to that network from your phone or computer
+4. Navigate to `http://bilalcast.net` — you'll be redirected automatically
+5. Fill in your Wi-Fi name, password, and the name of your Chromecast device (found in the Google Home app under device settings)
+6. Tap **Save & Connect** — the device will reboot and begin normal operation
 
+## Factory reset
 
+Hold the **BOOTSEL** button for 10 seconds while the device is booting. The LED will go solid then resume blinking to confirm. The device will clear its config and reopen the captive portal.
 
+## Hardware
+
+- Raspberry Pi Pico W
+- Any Chromecast device on the same Wi-Fi network
+
+## Firmware
+
+Built for **MicroPython 1.24** (rp2 port). Do not flash 1.25+ — mDNS scanning is broken on later versions.
+
+## Key files
+
+| File | Purpose |
+|---|---|
+| `bilalcast/main.py` | Entry point — boot, WiFi, prayer scheduling, cast |
+| `bilalcast/cast.py` | Chromecast Cast protocol over TCP/SSL |
+| `bilalcast/discovery.py` | mDNS device discovery and cast retry logic |
+| `bilalcast/prayer.py` | IP geolocation, Aladhan API, prayer time helpers |
+| `bilalcast/captive_portal.py` | Onboarding AP + web form |
+| `bilalcast/logger.py` | Logging — print (debug) or ntfy push notifications |
+| `bilalcast/mdns_client/` | mDNS client for Chromecast discovery |
+| `bilalcast/www/` | HTML pages for the captive portal |
+
+## Configuration
+
+Saved to `config.json` on the device after onboarding:
+
+```json
+{
+  "ssid": "your-wifi-name",
+  "password": "your-wifi-password",
+  "cast_device_name": "Living Room"
+}
+```
+
+Location is auto-detected at runtime via IP geolocation — no manual address entry needed.

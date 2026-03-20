@@ -7,7 +7,7 @@ ARG HOSTNAME=bilalcast
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y cmake build-essential libffi-dev git pkg-config gcc-arm-none-eabi -y
+    apt-get install -y cmake build-essential libffi-dev git pkg-config gcc-arm-none-eabi
 
 WORKDIR /opt/app
 ENV PATH=${PATH}:/root/.local/bin
@@ -52,19 +52,25 @@ RUN rm -rf modules/bilalcast/www
 
 # Create a tiny frozen main.py that runs your bilalcast.main on boot
 RUN printf '%s\n' \
-"try:" \
-"    import www_fs  # mounts /www if present" \
-"except Exception:" \
-"    pass" \
-"import bilalcast.main" \
-> modules/main.py                        
+    "try:" \
+    "    import www_fs  # mounts /www if present" \
+    "except Exception:" \
+    "    pass" \
+    "try:" \
+    "    import bilalcast.main" \
+    "except Exception as e:" \
+    "    import sys" \
+    "    sys.print_exception(e)" \
+    "    import machine, time" \
+    "    time.sleep(5)" \
+    "    machine.reset()" \
+    > modules/main.py                        
 
 # --- Freeze web assets as a compressed VFS -------------------
 ADD bilalcast/www /opt/app/www                  
 RUN python -m freezefs /opt/app/www /opt/app/www_fs.py \
     --on-import=mount --target /www --compress && rm -rf /opt/app/www
 RUN cp /opt/app/www_fs.py modules/www_fs.py
-  
 
 ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
 

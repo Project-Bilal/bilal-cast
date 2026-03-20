@@ -1,41 +1,79 @@
 import machine
 import network
 import utime as time
-import urequests
 import ujson as json
 import ntptime
-from cast import Chromecast
 
+import bilalcast.logger as logger
+from bilalcast.logger import log, send_ntfy
+from bilalcast.prayer import get_location, get_next_prayer, pre_athan_time, seconds_until, ATHANS, PRE_ATHAN
+from bilalcast.discovery import resolve_cast_device, cast_url
 
 # USER CONFIGURED DATA
-SSID = "Sarhan"
-PASSWORD = "7860000000"
-ADDRESS = "2305%20N%20159th%20st,%20shoreline%20wa%2098133"  # URL encoded address
-CAST_HOST = "10.0.0.73"        # hardcoded fallback if mDNS fails
-CAST_PORT = 32067               # hardcoded fallback if mDNS fails
-CAST_DEVICE_NAME = "Bilal Cast" # friendly name shown in Google Home
-DEBUG = True                    # True = print to console, False = send via ntfy
+DEBUG = False  # True = print to console, False = send via ntfy
+
+CONFIG_FILE = "config.json"
+
+# Runtime config — populated from CONFIG_FILE at boot
+SSID = None
+PASSWORD = None
+CAST_DEVICE_NAME = None
+
+_led = machine.Pin("LED", machine.Pin.OUT)
+_led_timer = None
 
 
-# constants
-FAJR_ATHAN = "athan_fajr_1"
-ATHAN = "athan_1"
-PRE_ATHAN = "Salat_Ibrahimiyya"
-ATHANS = {
-    "Fajr": FAJR_ATHAN,
-    "Dhuhr": ATHAN,
-    "Asr": ATHAN,
-    "Maghrib": ATHAN,
-    "Isha": ATHAN,
-}
-CAST_CACHE_FILE = "cast_device.json"
+def led_blink():
+    """Fast blink via hardware timer — works in both sync and async contexts."""
+    global _led_timer
+    _led_timer = machine.Timer(-1)
+    _led_timer.init(freq=4, mode=machine.Timer.PERIODIC, callback=lambda t: _led.toggle())
 
 
-def log(msg):
-    if DEBUG:
-        print(msg)
-    else:
-        send_ntfy(msg)
+def led_solid():
+    """Stop blinking and turn LED solidly on."""
+    global _led_timer
+    if _led_timer:
+        _led_timer.deinit()
+        _led_timer = None
+    _led.on()
+
+
+def check_factory_reset():
+    """Hold BOOTSEL for 10 seconds at boot to wipe config and open captive portal."""
+    import rp2
+
+    if not rp2.bootsel_button():
+        return False
+    log("BOOTSEL held — keep holding 10s to reset, release to cancel...")
+    for _ in range(100):  # 100 × 100ms = 10 seconds
+        time.sleep_ms(100)
+        if not rp2.bootsel_button():
+            log("BOOTSEL released, continuing normal boot.")
+            return False
+    led_solid()
+    time.sleep_ms(500)
+    led_blink()
+    return True
+
+
+def load_config():
+    try:
+        with open(CONFIG_FILE) as f:
+            d = json.load(f)
+        if d.get("ssid") and d.get("password") and d.get("cast_device_name"):
+            return d
+    except Exception:
+        pass
+    return None
+
+
+_NTP_HOSTS = [
+    "pool.ntp.org",
+    "time.google.com",
+    "time.cloudflare.com",
+    "time.apple.com",
+]
 
 
 def connect_to_wifi_with_retries(ssid, password, *, max_retries=100, timeout_seconds=30, retry_delay_s=2):
@@ -92,180 +130,25 @@ def connect_to_wifi_with_retries(ssid, password, *, max_retries=100, timeout_sec
 
 
 def set_rtc():
-    ntptime.host = "pool.ntp.org"
+    host_idx = 0
     while True:
+        ntptime.host = _NTP_HOSTS[host_idx % len(_NTP_HOSTS)]
         try:
             ntptime.settime()
         except Exception as e:
-            log("NTP sync failed, retrying: " + str(e))
+            log("NTP sync failed ({}), trying next host: {}".format(ntptime.host, str(e)))
+            host_idx += 1
             time.sleep(2)
             continue
 
-        # Guard against silent failure: ntptime can succeed without raising
-        # but leave the RTC at the Pico's default boot time (2021-01-01).
         year = time.localtime()[0]
         if year >= 2024:
-            log("RTC set (UTC): " + str(time.localtime()))
+            log("RTC set via {} (UTC): {}".format(ntptime.host, str(time.localtime())))
             return
 
-        log("RTC year implausible ({}), retrying...".format(year))
+        log("RTC year implausible ({}), trying next host...".format(year))
+        host_idx += 1
         time.sleep(2)
-
-
-def pre_athan_time(hhmm):
-    h, m = hhmm.split(":")
-    total = int(h) * 60 + int(m) - 10
-    return "{:02d}:{:02d}".format((total // 60) % 24, total % 60)
-
-
-def seconds_until(hhmm):
-    now = time.localtime()
-    now_secs = now[3] * 3600 + now[4] * 60 + now[5]
-    h, m = hhmm.split(":")
-    target_secs = int(h) * 3600 + int(m) * 60
-    diff = target_secs - now_secs
-    if diff < 0:
-        diff += 86400  # target is tomorrow
-    return diff
-
-
-def get_next_prayer():
-    ct = time.localtime()
-    formatted_date = f"{ct[2]:02d}-{ct[1]:02d}-{ct[0]}"
-    url = f"https://api.aladhan.com/v1/nextPrayerByAddress/{formatted_date}?address={ADDRESS}&latitudeAdjustmentMethod=1&calendarMethod=MATHEMATICAL&method=2&timezonestring=UTC"
-
-    while True:
-        try:
-            resp = urequests.get(url)
-            try:
-                resp_json = resp.json()
-            finally:
-                resp.close()  # always close, even if .json() throws
-            if resp_json.get("code") == 200:
-                timings = resp_json["data"]["timings"]
-                # Filter to only prayers we know; API can include Sunrise/Imsak etc.
-                for prayer, prayer_time in timings.items():
-                    if prayer in ATHANS:
-                        prayer_time = prayer_time[:5]  # strip any trailing timezone suffix
-                        log("next prayer: {} {}".format(prayer, prayer_time))
-                        return prayer, prayer_time
-                log("No known prayer in response, retrying...")
-        except Exception as e:
-            log("Next prayer fetch failed, retrying: " + str(e))
-        time.sleep(2)
-
-
-def _load_cast_cache():
-    try:
-        with open(CAST_CACHE_FILE) as f:
-            d = json.load(f)
-        host, port = d.get("host"), d.get("port")
-        if host and port:
-            return host, int(port)
-    except Exception:
-        pass
-    return None, None
-
-
-def _save_cast_cache(host, port):
-    try:
-        with open(CAST_CACHE_FILE, "w") as f:
-            json.dump({"host": host, "port": port}, f)
-    except Exception as e:
-        log("Cache save failed: " + str(e))
-
-
-def _device_reachable(host, port):
-    cc = None
-    try:
-        cc = Chromecast(host, port)
-        return True
-    except Exception:
-        return False
-    finally:
-        if cc:
-            try:
-                cc.disconnect()
-            except Exception:
-                pass
-
-
-def _mdns_find(local_ip, name):
-    import asyncio
-
-    try:
-        from bilalcast.mdns_client import Client
-        from bilalcast.mdns_client.service_discovery.txt_discovery import TXTServiceDiscovery
-    except ImportError as e:
-        log("mDNS not available: " + str(e))
-        return None, None
-
-    async def _scan():
-        discovery = TXTServiceDiscovery(Client(local_ip))
-        for attempt in range(10):
-            try:
-                results = await discovery.query_once("_googlecast", "_tcp", timeout=0.6)
-                for d in results or ():
-                    try:
-                        fn = d.txt_records.get("fn") or []
-                        found_name = fn[0].strip() if fn else ""
-                    except Exception:
-                        found_name = ""
-                    if found_name.lower() == name.lower():
-                        host = next((ip for ip in (d.ips or []) if "." in ip), None)
-                        port = int(d.port) if d.port is not None else None
-                        if host and port:
-                            return host, port
-            except Exception as e:
-                log("mDNS attempt {} failed: {}".format(attempt + 1, e))
-            await asyncio.sleep_ms(300)
-        return None, None
-
-    try:
-        return asyncio.run(_scan())
-    except Exception as e:
-        log("mDNS scan error: " + str(e))
-        return None, None
-
-
-def resolve_cast_device(local_ip):
-    # 1. Check cache and verify the device still responds
-    host, port = _load_cast_cache()
-    if host and port:
-        log("Cache hit: {}:{}, verifying...".format(host, port))
-        if _device_reachable(host, port):
-            log("Cached device confirmed.")
-            return host, port
-        log("Cached device unreachable, scanning mDNS...")
-
-    # 2. mDNS scan for the friendly name
-    log("Scanning mDNS for '{}'...".format(CAST_DEVICE_NAME))
-    host, port = _mdns_find(local_ip, CAST_DEVICE_NAME)
-    if host and port:
-        log("Found via mDNS: {}:{}".format(host, port))
-        _save_cast_cache(host, port)
-        return host, port
-
-    # 3. Hardcoded fallback
-    log("mDNS failed, using hardcoded fallback: {}:{}".format(CAST_HOST, CAST_PORT))
-    return CAST_HOST, CAST_PORT
-
-
-def cast_url(url, host, port, max_retries=3):
-    for attempt in range(1, max_retries + 1):
-        cc = None
-        try:
-            cc = Chromecast(host, port)
-            if cc.play_url(url):
-                return True
-            log("Cast attempt {}/{}: no confirmation from device".format(attempt, max_retries))
-        except Exception as e:
-            log("Cast attempt {}/{} failed: {}".format(attempt, max_retries, e))
-        finally:
-            if cc:
-                cc.disconnect()
-        time.sleep(3)
-    return False
 
 
 def ensure_wifi():
@@ -275,37 +158,83 @@ def ensure_wifi():
         connect_to_wifi_with_retries(SSID, PASSWORD)
 
 
-def send_ntfy(msg):
-    try:
-        resp = urequests.post("https://ntfy.sh/bilalpico", data="shoreline - " + msg)
-        resp.close()
-    except Exception as e:
-        print("ntfy failed:", e)  # non-fatal, do not crash
-
-
 def main():
+    global SSID, PASSWORD, CAST_DEVICE_NAME
+
+    logger.configure(True, None)  # always print before WiFi is up
+    led_blink()
     log("athan starting")
+
+    if check_factory_reset():
+        log("Factory reset confirmed, clearing config...")
+        import os
+
+        for f in (CONFIG_FILE, "cast_device.json"):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
+        import asyncio
+        from bilalcast.captive_portal import captive_portal as _portal
+
+        asyncio.run(_portal())
+        return  # never reached — portal resets the device after save
+
+    config = load_config()
+    if not config:
+        log("No config found, starting captive portal...")
+        import asyncio
+        from bilalcast.captive_portal import captive_portal as _portal
+
+        asyncio.run(_portal())
+        return  # never reached — portal resets the device after save
+
+    SSID = config["ssid"]
+    PASSWORD = config["password"]
+    CAST_DEVICE_NAME = config["cast_device_name"]
+
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD)
+    logger.configure(DEBUG, CAST_DEVICE_NAME)  # switch to configured mode now that WiFi is up
     set_rtc()
 
-    send_ntfy("online: {}".format(time.localtime()))
+    cast_host, cast_port = resolve_cast_device(local_ip, CAST_DEVICE_NAME)
+    log("cast device: {}:{}".format(cast_host, cast_port))
+    led_solid()
 
-    cast_host, cast_port = resolve_cast_device(local_ip)
-    prayer, prayer_time = get_next_prayer()
+    t = time.localtime()
+    send_ntfy(
+        "online: {:04d}-{:02d}-{:02d} {:02d}:{:02d} UTC".format(t[0], t[1], t[2], t[3], t[4]),
+        priority=2,
+        tags=["white_check_mark"],
+    )
+    lat, lon = get_location()
+    prayer, prayer_time = get_next_prayer(lat, lon)
     pre_time = pre_athan_time(prayer_time)
 
     secs_to_pre = seconds_until(pre_time)
     secs_to_prayer = seconds_until(prayer_time)
 
     if secs_to_pre < secs_to_prayer:
-        secs, audio_file, label = secs_to_pre, PRE_ATHAN, f"pre_{prayer}, {pre_time}"
+        secs, target, audio_file, label = secs_to_pre, pre_time, PRE_ATHAN, f"pre_{prayer}, {pre_time}"
     else:
-        secs, audio_file, label = secs_to_prayer, ATHANS[prayer], f"{prayer}, {prayer_time}"
+        secs, target, audio_file, label = secs_to_prayer, prayer_time, ATHANS[prayer], f"{prayer}, {prayer_time}"
 
-    time.sleep(secs)
+    time.sleep(max(0, secs - 30))
+
+    # Poll every second until HH:MM matches; 60s safety timeout covers overshoot
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        now = time.localtime()
+        if "{:02d}:{:02d}".format(now[3], now[4]) == target:
+            break
+        time.sleep(1)
+
     ensure_wifi()
-    ok = cast_url(f"https://storage.googleapis.com/athans/{audio_file}.mp3", cast_host, cast_port)
-    send_ntfy(label if ok else f"cast failed: {label}")
+    ok, cast_error = cast_url(audio_file, cast_host, cast_port)
+    if ok:
+        send_ntfy(label, priority=3, tags=["bell"])
+    else:
+        send_ntfy("cast failed: {} — {}".format(label, cast_error), priority=5, tags=["warning"])
 
     machine.reset()
 

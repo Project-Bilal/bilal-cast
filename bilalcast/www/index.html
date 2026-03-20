@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,8 +24,17 @@
             border-radius: 1rem;
             max-width: 400px;
             width: 100%;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
             animation: fadeIn 0.8s ease-in-out;
+        }
+
+        .logo {
+            display: block;
+            margin: 0 auto 1rem;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
         }
 
         h1 {
@@ -48,6 +58,7 @@
         }
 
         input {
+            box-sizing: border-box;
             width: 100%;
             padding: 0.6rem;
             border: 1px solid #ccc;
@@ -61,7 +72,7 @@
             box-shadow: 0 0 5px rgba(67, 206, 162, 0.5);
         }
 
-        button {
+button {
             width: 100%;
             padding: 0.8rem;
             margin-top: 1.5rem;
@@ -80,27 +91,37 @@
         }
 
         @keyframes fadeIn {
-            from {opacity: 0; transform: translateY(20px);}
-            to {opacity: 1; transform: translateY(0);}
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
+
 <body>
     <div class="card">
-        <h1>Setup</h1>
-        <p>You are connected to the Bilal Cast setup page.
-        <br>
-        Let’s configure Wi-Fi:</p>
-        <form action="/configure" method="POST" autocomplete="off" autocapitalize="none">
-            <label for="ssid">SSID (Wi-Fi name)</label>
+        <img src="/icon.png" alt="Bilal Cast" class="logo">
+
+        <form action="/configure" method="POST" autocomplete="off" autocapitalize="none" id="cfg">
+            <label for="ssid">Wi-Fi Name (SSID)</label>
             <input type="text" id="ssid" name="ssid" required>
 
-            <label for="password">Password</label>
+            <label for="password">Wi-Fi Password</label>
             <input type="text" id="password" name="password" required>
 
-            <button type="submit">Save</button>
+            <label for="cast_device_name">Cast Device Name</label>
+            <input type="text" id="cast_device_name" name="cast_device_name"
+                placeholder="Found in Google Home app under device settings" required>
+
+            <button type="submit">Save &amp; Connect</button>
         </form>
     </div>
 </body>
-</html>
 
+</html>

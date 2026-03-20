@@ -2,7 +2,22 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:aladhan.com)",
-      "WebFetch(domain:api.aladhan.com)"
+      "WebFetch(domain:api.aladhan.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.ntfy.sh)",
+      "Bash(which micropython:*)",
+      "Bash(brew list:*)",
+      "Bash(brew install:*)",
+      "Bash(micropython:*)",
+      "WebFetch(domain:micropython.org)",
+      "Bash(curl:*)",
+      "Read(//tmp/**)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(pip3 show:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
