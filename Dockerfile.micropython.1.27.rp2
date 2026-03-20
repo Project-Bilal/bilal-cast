@@ -1,0 +1,80 @@
+FROM --platform=linux/x86_64 python:3.12
+
+ARG MICROPYTHON_VERSION=v1.27.0
+ARG MICROPYTHON_FILE_PATH=1.27
+ARG BOARD=RPI_PICO_W
+ARG HOSTNAME=bilalcast
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y cmake build-essential libffi-dev git pkg-config gcc-arm-none-eabi
+
+WORKDIR /opt/app
+
+ENV PATH=${PATH}:/root/.local/bin
+
+RUN git clone https://github.com/micropython/micropython && \
+    cd /opt/app/micropython && \
+    git checkout ${MICROPYTHON_VERSION} && \
+    git submodule update --init && \
+    pip install -U pip && \
+    pip install pyparsing==2.3.1 && \
+    pip install esptool==3.0 && \
+    pip install pyserial==3.5 && \
+    pip install 'click>=7.0' \
+    'future>=0.15.2' \
+    'pyelftools>=0.22' \
+    'idf-component-manager~=1.2' \
+    'urllib3<2' \
+    'pygdbmi<=0.9.0.2' \
+    'kconfiglib==13.7.1' \
+    'bitstring>=3.1.6,<4' \
+    'construct>=2.10.54,<3' && \
+    pip install freezefs==2.4 && \
+    mkdir -p /tmp/bilalcast-build
+
+WORKDIR /opt/app/micropython
+
+RUN sed -i -E 's/define LWIP_MDNS_RESPONDER([ ]+)1/define LWIP_MDNS_RESPONDER\10/g' ports/rp2/lwip_inc/lwipopts.h
+RUN sed -i -E 's/define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT([ ]+)"[^"]+"/define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT\1"'"${HOSTNAME}"'"/g' ports/rp2/boards/RPI_PICO_W/mpconfigboard.h
+
+ENV BOARD=${BOARD}
+ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
+
+RUN make -C mpy-cross
+
+RUN git submodule update --init -- lib/pico-sdk lib/tinyusb
+
+WORKDIR /opt/app/micropython/ports/rp2
+
+# --- Freeze code --------------------------------------------------------
+# Copy your bilalcast package (contains /src/bilalcast/main.py etc.)
+COPY bilalcast modules/bilalcast 
+RUN rm -rf modules/bilalcast/www      
+
+# Create a tiny frozen main.py that runs your bilalcast.main on boot
+RUN printf '%s\n' \
+    "try:" \
+    "    import www_fs  # mounts /www if present" \
+    "except Exception:" \
+    "    pass" \
+    "try:" \
+    "    import bilalcast.main" \
+    "except Exception as e:" \
+    "    import sys" \
+    "    sys.print_exception(e)" \
+    "    import machine, time" \
+    "    time.sleep(5)" \
+    "    machine.reset()" \
+    > modules/main.py                        
+
+# --- Freeze web assets as a compressed VFS -------------------
+COPY bilalcast/www /opt/app/www                  
+RUN python -m freezefs /opt/app/www /opt/app/www_fs.py \
+    --on-import=mount --target /www --compress && rm -rf /opt/app/www
+RUN cp /opt/app/www_fs.py modules/www_fs.py
+
+ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
+
+ENTRYPOINT [ "bash" ]
+CMD ["-c", "make clean && make submodules && make -j16 && cp build-${BOARD}/firmware.uf2 /tmp/bilalcast-build/firmware.mp.${MICROPYTHON_FILE_PATH}.rp2.uf2"]
