@@ -7,7 +7,14 @@ import os
 
 import bilalcast.logger as logger
 from bilalcast.logger import log, send_ntfy
-from bilalcast.prayer import get_location, get_next_prayer, pre_athan_time, seconds_until, ATHANS, PRE_ATHAN
+from bilalcast.prayer import (
+    get_location,
+    get_next_prayer,
+    pre_athan_time,
+    seconds_until,
+    ATHANS,
+    PRE_ATHAN,
+)
 from bilalcast.discovery import resolve_cast_device, cast_url
 
 # USER CONFIGURED DATA
@@ -30,7 +37,9 @@ def led_blink():
     """Fast blink via hardware timer — works in both sync and async contexts."""
     global _led_timer
     _led_timer = machine.Timer(-1)
-    _led_timer.init(freq=4, mode=machine.Timer.PERIODIC, callback=lambda t: _led.toggle())
+    _led_timer.init(
+        freq=4, mode=machine.Timer.PERIODIC, callback=lambda t: _led.toggle()
+    )
 
 
 def led_solid():
@@ -79,7 +88,9 @@ _NTP_HOSTS = [
 ]
 
 
-def connect_to_wifi_with_retries(ssid, password, *, max_retries=100, timeout_seconds=30, retry_delay_s=2):
+def connect_to_wifi_with_retries(
+    ssid, password, *, max_retries=10, timeout_seconds=30, retry_delay_s=2
+):
     statuses = {
         network.STAT_IDLE: "idle",
         network.STAT_CONNECTING: "connecting",
@@ -139,7 +150,11 @@ def set_rtc(max_attempts=20):
         try:
             ntptime.settime()
         except Exception as e:
-            log("NTP sync failed ({}), trying next host: {}".format(ntptime.host, str(e)))
+            log(
+                "NTP sync failed ({}), trying next host: {}".format(
+                    ntptime.host, str(e)
+                )
+            )
             time.sleep(2)
             continue
 
@@ -203,7 +218,9 @@ def main():
         first_connection = True
 
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD)
-    logger.configure(DEBUG, CAST_DEVICE_NAME)  # switch to configured mode now that WiFi is up
+    logger.configure(
+        DEBUG, CAST_DEVICE_NAME
+    )  # switch to configured mode now that WiFi is up
     set_rtc()
 
     cast_host, cast_port = resolve_cast_device(local_ip, CAST_DEVICE_NAME)
@@ -216,7 +233,9 @@ def main():
 
     t = time.localtime()
     send_ntfy(
-        "online: {:04d}-{:02d}-{:02d} {:02d}:{:02d} UTC".format(t[0], t[1], t[2], t[3], t[4]),
+        "online: {:04d}-{:02d}-{:02d} {:02d}:{:02d} UTC".format(
+            t[0], t[1], t[2], t[3], t[4]
+        ),
         priority=2,
         tags=["white_check_mark"],
     )
@@ -228,9 +247,19 @@ def main():
     secs_to_prayer = seconds_until(prayer_time)
 
     if secs_to_pre < secs_to_prayer:
-        secs, target, audio_file, label = secs_to_pre, pre_time, PRE_ATHAN, f"pre_{prayer}, {pre_time}"
+        secs, target, audio_file, label = (
+            secs_to_pre,
+            pre_time,
+            PRE_ATHAN,
+            f"pre_{prayer}, {pre_time}",
+        )
     else:
-        secs, target, audio_file, label = secs_to_prayer, prayer_time, ATHANS[prayer], f"{prayer}, {prayer_time}"
+        secs, target, audio_file, label = (
+            secs_to_prayer,
+            prayer_time,
+            ATHANS[prayer],
+            f"{prayer}, {prayer_time}",
+        )
 
     time.sleep(max(0, secs - 30))
 
@@ -247,7 +276,11 @@ def main():
     if ok:
         send_ntfy(label, priority=3, tags=["bell"])
     else:
-        send_ntfy("cast failed: {} — {}".format(label, cast_error), priority=5, tags=["warning"])
+        send_ntfy(
+            "cast failed: {} — {}".format(label, cast_error),
+            priority=5,
+            tags=["warning"],
+        )
 
     time.sleep(200)
     machine.reset()

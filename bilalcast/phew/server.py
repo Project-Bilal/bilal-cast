@@ -257,6 +257,10 @@ class Phew:
         if "content-length" in request.headers and "content-type" in request.headers:
             if request.headers["content-type"].startswith("multipart/form-data"):
                 request.form = await _parse_form_data(reader, request.headers)
+            elif request.headers["content-type"].startswith("application/x-www-form-urlencoded"):
+                length = int(request.headers["content-length"])
+                body = await reader.read(length)
+                request.form = _parse_query_string(body.decode("utf-8"))
 
         route = self._match_route(request)
         if route:

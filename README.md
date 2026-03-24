@@ -21,7 +21,7 @@ The device uses a captive portal for onboarding — no app required.
 3. Connect to that network from your phone or computer
 4. Navigate to `http://bilalcast.net` — you'll be redirected automatically
 5. Select your Wi-Fi network from the dropdown (scanned automatically) or choose "Other" to type it manually. Enter your password and the name of your Chromecast device (found in the Google Home app under device settings)
-6. Tap **Save & Connect** — the device will reboot and begin normal operation
+6. Tap **Save & Connect** — the device will reboot, connect to your network, and play a short activation message on your Chromecast to confirm it's working
 
 ## Factory reset
 

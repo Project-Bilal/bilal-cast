@@ -24,40 +24,47 @@ Standalone MicroPython **1.24** app for Pico W that plays the athan (call to pra
 
 ### User-configured constants (top of file)
 - `DEBUG` — `True` = print to console, `False` = send via ntfy
+- `ACTIVATION_URL` — URL cast on first connection after onboarding (a welcome/activation TTS message)
 
 ### Runtime vars (populated from config.json at boot)
 `SSID`, `PASSWORD`, `CAST_DEVICE_NAME` — read from `config.json`. No address field; location is auto-detected via IP geolocation.
 
 ### Key functions
+- `led_blink()` / `led_solid()` — hardware timer-based LED blink (boot indicator); solid = ready.
 - `log(msg)` — print if DEBUG, else send_ntfy. send_ntfy's own error handler stays as print (avoid recursion).
-- `set_rtc()` — uses ntptime (NTP/UDP); guards against silent failure by checking year >= 2024.
+- `set_rtc(max_attempts=20)` — tries multiple NTP hosts (`_NTP_HOSTS` list) in rotation; guards against silent failure by checking year >= 2024.
 - `get_location()` — hits `http://ip-api.com/json`; returns `(lat, lon)`.
 - `get_next_prayer(lat, lon)` — calls aladhan `nextPrayer/{date}` with lat/lon; filters timings to ATHANS dict; try/finally on resp.close().
 - `pre_athan_time(hhmm)` — computes 10-min-before, midnight-safe.
 - `seconds_until(hhmm)` — midnight-safe seconds until HH:MM.
 - `resolve_cast_device(local_ip, name)` — 3-step: (1) load cache + verify reachable, (2) mDNS scan (10 attempts × 3s), (3) reset.
-- `cast_url(url, host, port, max_retries=3)` — retries on exception or False (transport_id timeout); disconnects on failure/retry only. On success, connection is intentionally left open — `machine.reset()` tears it down after the 200s sleep. Closing immediately after LOAD was causing intermittent cast failures.
+- `cast_url(url, host, port, max_retries=3)` — returns `(ok, error_str)`. Retries on exception or False (transport_id timeout); disconnects on failure/retry only. On success, connection is intentionally left open — `machine.reset()` tears it down after the 200s sleep. Closing immediately after LOAD was causing intermittent cast failures.
 - `ensure_wifi()` — checks isconnected() before casting, reconnects if dropped.
 - `check_factory_reset()` — hold BOOTSEL 10s at boot to wipe config and reopen captive portal.
 
 ### main() boot flow
 ```
-logger.configure(DEBUG, None)
+logger.configure(True, None)      # always print before WiFi is up
+led_blink()
 check_factory_reset() → if confirmed → clear config files → asyncio.run(captive_portal())
 load_config()         → if None      → asyncio.run(captive_portal())
 populate SSID / PASSWORD / CAST_DEVICE_NAME
-logger.configure(DEBUG, CAST_DEVICE_NAME)
 connect_to_wifi_with_retries(SSID, PASSWORD)
+logger.configure(DEBUG, CAST_DEVICE_NAME)   # switch to configured mode
 set_rtc()
 resolve_cast_device(local_ip, CAST_DEVICE_NAME)
+led_solid()
+if first_connection (no cast_device.json yet) → cast_url(ACTIVATION_URL, ...)
 send_ntfy("online: YYYY-MM-DD HH:MM UTC")
 get_location()  →  get_next_prayer(lat, lon)
-pre_athan_time() + seconds_until()
+pre_athan_time() + seconds_until() for both pre and prayer
+pick whichever target (pre or prayer) is sooner
 time.sleep(max(0, secs - 30))
 poll every 1s until HH:MM == target (60s safety deadline)
 ensure_wifi()
-cast_url(audio_file, cast_host, cast_port)
-send_ntfy(label or "cast failed: ...")
+ok, cast_error = cast_url(audio_file, cast_host, cast_port)
+send_ntfy(label) or send_ntfy("cast failed: label — error")
+time.sleep(200)
 machine.reset()
 ```
 
