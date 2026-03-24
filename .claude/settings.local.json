@@ -17,7 +17,13 @@
       "Bash(python3:*)",
       "Bash(pip3 install:*)",
       "Bash(pip3 show:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(docker build:*)",
+      "Bash(ls -lh /Users/omars/stash/bilal-cast/*.uf2)",
+      "Bash(ls -lh /Users/omars/stash/bilal-cast/build*/*.uf2)",
+      "Bash(docker build *)",
+      "Bash(docker run *)",
+      "Bash(grep:*)"
     ]
   }
 }

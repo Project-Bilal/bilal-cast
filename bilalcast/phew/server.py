@@ -1,16 +1,7 @@
-import binascii
 import gc
-import random
 
 import uasyncio, os, time  # pyright: ignore[reportMissingImports]
 from . import logging
-
-
-def file_exists(filename):
-    try:
-        return (os.stat(filename)[0] & 0x4000) == 0
-    except OSError:
-        return False
 
 
 def urldecode(text):
@@ -55,19 +46,6 @@ class Request:
         self.query = {}
         self.headers = {}
 
-        # --- NEW: endpoint info populated by the server in _handle_request ---
-        self.client_addr = None  # (ip, port) of the remote peer
-        self.server_addr = None  # (ip, port) local socket
-        self.remote_addr = None  # ip string of caller
-        self.remote_port = None  # int port of caller
-        self.local_addr = None  # ip string bound locally
-        self.local_port = None  # int local port
-
-        # --- NEW: parsed Host header (what the client addressed us as) ---
-        self.host = None  # raw Host header, e.g. "pico.lan:80"
-        self.host_name = None  # e.g. "pico.lan" or "192.168.1.50"
-        self.host_port = None  # e.g. 80
-
         query_string_start = uri.find("?") if uri.find("?") != -1 else len(uri)
         self.path = uri[:query_string_start]
         self.query_string = uri[query_string_start + 1 :]
@@ -77,10 +55,6 @@ class Request:
     def __str__(self):
         return f"""\nrequest: {self.method} {self.path} {self.protocol}
 headers: {self.headers}
-remote: {self.remote_addr}:{self.remote_port}
-local: {self.local_addr}:{self.local_port}
-host: {self.host}
-port: {self.remote_port}
 form: {self.form}
 data: {self.data}"""
 
@@ -218,15 +192,6 @@ async def _parse_form_data(reader, headers):
     return None
 
 
-# if the content type is application/json then parse the body
-async def _parse_json_body(reader, headers):
-    import json
-
-    content_length_bytes = int(headers["content-length"])
-    body = await reader.readexactly(content_length_bytes)
-    return json.loads(body.decode())
-
-
 status_message_map = {
     200: "OK",
     201: "Created",
@@ -262,90 +227,12 @@ status_message_map = {
 }
 
 
-# --- NEW: helper to get remote/local endpoints from the streams/socket ---
-def _get_endpoints(reader, writer):
-    """
-    Returns (peer, local) where each is a (ip, port) tuple or (None, None).
-    Tries uasyncio's get_extra_info first, then falls back to socket attrs.
-    """
-    peer = (None, None)
-    local = (None, None)
-
-    gi = getattr(writer, "get_extra_info", None)
-    if gi:
-        try:
-            p = gi("peername")
-            if p:
-                peer = p
-        except:
-            pass
-        try:
-            l = gi("sockname")
-            if l:
-                local = l
-        except:
-            pass
-        # Some builds expose the socket itself
-        try:
-            s = gi("socket")
-            if s:
-                if peer == (None, None):
-                    try:
-                        peer = s.getpeername()
-                    except:
-                        pass
-                if local == (None, None):
-                    try:
-                        local = s.getsockname()
-                    except:
-                        pass
-        except:
-            pass
-    else:
-        # Fallback for older uasyncio builds with private attrs
-        for attr in ("_sock", "s", "sock", "_socket"):
-            s = getattr(writer, attr, None) or getattr(reader, attr, None)
-            if s:
-                try:
-                    peer = s.getpeername()
-                except:
-                    pass
-                try:
-                    local = s.getsockname()
-                except:
-                    pass
-                break
-
-    return peer, local
-
-
-class Session:
-    """
-    Session class used to store all the attributes of a session.
-    """
-
-    def __init__(self, max_age=86400):
-        # create a 128 bit session id encoded in hex
-        n = []
-        for i in range(4):
-            n.append(random.getrandbits(32).to_bytes(4, "big"))
-        self.session_id = binascii.hexlify(bytearray().join(n)).decode()
-        self.expires = time.time() + max_age
-        self.max_age = max_age
-
-    def expired(self):
-        return self.expires < time.time()
-
-
 class Phew:
 
     def __init__(self):
         self._routes = []
-        self._login_required = set()
         self.catchall_handler = None
-        self._login_catchall = None
         self.loop = uasyncio.get_event_loop()
-        self.sessions = []
 
     # handle an incoming request to the web server
     async def _handle_request(self, reader, writer):
@@ -364,68 +251,18 @@ class Phew:
             logging.error(e)
             return
 
-        # --- NEW: capture client/server endpoints as early as possible ---
-        peer, local = _get_endpoints(reader, writer)
-
         request = Request(method, uri, protocol)
-
-        # --- NEW: attach endpoints to Request ---
-        request.client_addr = peer
-        request.server_addr = local
-        if peer and len(peer) >= 2:
-            request.remote_addr, request.remote_port = peer[0], peer[1]
-        if local and len(local) >= 2:
-            request.local_addr, request.local_port = local[0], local[1]
-
         request.headers = await _parse_headers(reader)
-
-        # --- NEW: parse Host header into host_name/host_port ---
-        h = request.headers.get("host")
-        if h:
-            request.host = h
-            if ":" in h:
-                host_name, host_port = h.rsplit(":", 1)
-                request.host_name = host_name
-                try:
-                    request.host_port = int(host_port)
-                except:
-                    request.host_port = None
-            else:
-                request.host_name = h
-                request.host_port = None
 
         if "content-length" in request.headers and "content-type" in request.headers:
             if request.headers["content-type"].startswith("multipart/form-data"):
                 request.form = await _parse_form_data(reader, request.headers)
-            if request.headers["content-type"].startswith("application/json"):
-                request.data = await _parse_json_body(reader, request.headers)
-            if request.headers["content-type"].startswith("application/x-www-form-urlencoded"):
-                form_data = b""
-                content_length = int(request.headers["content-length"])
-                while content_length > 0:
-                    data = await reader.read(content_length)
-                    if len(data) == 0:
-                        break
-                    content_length -= len(data)
-                    form_data += data
-                request.form = _parse_query_string(form_data.decode())
 
         route = self._match_route(request)
-        if (
-            route
-            and self._login_catchall
-            and self.is_login_required(route.handler)
-            and not self.active_session(request)
-        ):
-            response = self._login_catchall(request)
-        elif route:
+        if route:
             response = route.call_handler(request)
         elif self.catchall_handler:
-            if self.is_login_required(self.catchall_handler) and not self.active_session(request):
-                # handle the case that the catchall handler is annotated with @login_required()
-                response = self._login_catchall(request)
-            else:
-                response = self.catchall_handler(request)
+            response = self.catchall_handler(request)
 
         # if shorthand body generator only notation used then convert to tuple
         if type(response).__name__ == "generator":
@@ -498,32 +335,6 @@ class Phew:
 
         return _route
 
-    # add the handler to the _login_required list
-    def add_login_required(self, handler):
-        self._login_required.add(handler)
-
-    def is_login_required(self, handler):
-        return handler in self._login_required
-
-    # decorator indicating that authentication is required for a handler
-    def login_required(self):
-        def _login_required(f):
-            self.add_login_required(f)
-            return f
-
-        return _login_required
-
-    def set_login_catchall(self, handler):
-        self._login_catchall = handler
-
-    # decorator for adding login_handler route
-    def login_catchall(self):
-        def _login_catchall(f):
-            self.set_login_catchall(f)
-            return f
-
-        return _login_catchall
-
     # decorator for adding catchall route
     def catchall(self):
         def _catchall(f):
@@ -531,9 +342,6 @@ class Phew:
             return f
 
         return _catchall
-
-    def redirect(self, url, status=301):
-        return Response("", status, {"Location": url})
 
     def serve_file(self, file):
         return FileResponse(file)
@@ -547,88 +355,3 @@ class Phew:
 
     def run_as_task(self, loop, host="0.0.0.0", port=80, ssl=None):
         loop.create_task(uasyncio.start_server(self._handle_request, host, port, ssl=ssl))
-
-    def run(self, host="0.0.0.0", port=80, ssl=None):
-        logging.info("> starting web server on port {}".format(port))
-        self.loop.create_task(uasyncio.start_server(self._handle_request, host, port, ssl=ssl))
-        self.loop.run_forever()
-
-    def stop(self):
-        self.loop.stop()
-
-    def close(self):
-        self.loop.close()
-
-    def create_session(self, max_age=86400):
-        session = Session(max_age=max_age)
-        self.sessions.append(session)
-        return session
-
-    def get_session(self, request):
-        session = None
-        name = None
-        value = None
-        if "cookie" in request.headers:
-            cookie = request.headers["cookie"]
-            if cookie and "=" in cookie:
-                name, value = cookie.split("=", 1)
-            if name == "sessionid":
-                # find session
-                for s in self.sessions:
-                    if s.session_id == value:
-                        session = s
-        return session
-
-    def remove_session(self, request):
-        session = self.get_session(request)
-        if session is not None:
-            self.sessions.remove(session)
-
-    def active_session(self, request):
-        session = self.get_session(request)
-        return session is not None and not session.expired()
-
-
-# Compatibility methods
-default_phew_app = None
-
-
-def default_phew():
-    global default_phew_app
-    if not default_phew_app:
-        default_phew_app = Phew()
-    return default_phew_app
-
-
-def set_callback(handler):
-    default_phew().set_callback(handler)
-
-
-# decorator shorthand for adding a route
-def route(path, methods=["GET"]):
-    return default_phew().route(path, methods)
-
-
-# decorator for adding catchall route
-def catchall():
-    return default_phew().catchall()
-
-
-def redirect(url, status=301):
-    return default_phew().redirect(url, status)
-
-
-def serve_file(file):
-    return default_phew().serve_file(file)
-
-
-def run(host="0.0.0.0", port=80):
-    default_phew().run(host, port)
-
-
-def stop():
-    default_phew().stop()
-
-
-def close():
-    default_phew().close()

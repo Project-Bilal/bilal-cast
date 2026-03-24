@@ -36,7 +36,7 @@ Standalone MicroPython **1.24** app for Pico W that plays the athan (call to pra
 - `pre_athan_time(hhmm)` — computes 10-min-before, midnight-safe.
 - `seconds_until(hhmm)` — midnight-safe seconds until HH:MM.
 - `resolve_cast_device(local_ip, name)` — 3-step: (1) load cache + verify reachable, (2) mDNS scan (10 attempts × 3s), (3) reset.
-- `cast_url(url, host, port, max_retries=3)` — retries on exception or False (transport_id timeout); always disconnects in finally.
+- `cast_url(url, host, port, max_retries=3)` — retries on exception or False (transport_id timeout); disconnects on failure/retry only. On success, connection is intentionally left open — `machine.reset()` tears it down after the 200s sleep. Closing immediately after LOAD was causing intermittent cast failures.
 - `ensure_wifi()` — checks isconnected() before casting, reconnects if dropped.
 - `check_factory_reset()` — hold BOOTSEL 10s at boot to wipe config and reopen captive portal.
 
@@ -79,11 +79,31 @@ No address field — location is auto-detected via IP geolocation (`ip-api.com`)
 Headless onboarding: no config → device creates AP "Bilal Cast Onboarding" → user connects → fills form (SSID, password, cast device name) → saves config.json → reboots → runs normally.
 
 - `captive_portal.py` saves 3 fields to config.json: `ssid`, `password`, `cast_device_name`
-- `www/index.html` — form with SSID, password (plain text), cast device name
+- `www/index.html` — form with SSID dropdown (populated from scan), password (plain text), cast device name
 - `www/configured.html` — save-confirmed + rebooting message
+
+### Wi-Fi scan in captive portal
+Before starting the AP, `captive_portal.py` activates STA, waits 2 seconds for hardware to settle, calls `wlan.scan()`, sorts results by RSSI, deduplicates, and builds an HTML `<option>` string passed to the index template as `network_options`. The scan is blocking but safe — the AP isn't up yet so no requests can arrive. If the scan fails, `network_options` is empty and the form falls back to manual SSID entry.
+
+The template uses `{{network_options + ""}}` (not `{{network_options}}`) to bypass phew's automatic HTML-escaping, which would otherwise turn `<option>` tags into literal text.
+
+The dropdown has a "Other (type below)" option at the bottom. Selecting it reveals a text input for manual entry. Selecting a scanned network auto-fills a hidden text input that is submitted as `ssid`.
 
 ### Important uasyncio note
 `captive_portal.py` uses `while True: await asyncio.sleep_ms(1000)` (not `loop.run_forever()`) so that `asyncio.run(captive_portal())` from sync `main.py` works correctly in uasyncio.
+
+---
+
+## Building the firmware
+
+The UF2 firmware is built via Docker using `Dockerfile.micropython.1.24.rp2`.
+
+```bash
+docker build -t bilalcast-rp2 -f Dockerfile.micropython.1.24.rp2 .
+docker run -v $(pwd):/tmp/bilalcast-build bilalcast-rp2
+```
+
+Use the `/build` skill as a shortcut — it runs both commands in sequence.
 
 ---
 

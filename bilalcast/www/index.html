@@ -57,16 +57,17 @@
             color: #333;
         }
 
-        input {
+        input, select {
             box-sizing: border-box;
             width: 100%;
             padding: 0.6rem;
             border: 1px solid #ccc;
             border-radius: 0.5rem;
             font-size: 1rem;
+            background: #fff;
         }
 
-        input:focus {
+        input:focus, select:focus {
             outline: none;
             border-color: #43cea2;
             box-shadow: 0 0 5px rgba(67, 206, 162, 0.5);
@@ -109,8 +110,17 @@ button {
         <img src="/icon.png" alt="Bilal Cast" class="logo">
 
         <form action="/configure" method="POST" autocomplete="off" autocapitalize="none" id="cfg">
-            <label for="ssid">Wi-Fi Name (SSID)</label>
-            <input type="text" id="ssid" name="ssid" required>
+            <div id="picker_wrap" style="display:{{show_picker}}">
+                <label for="ssid_picker">Wi-Fi Network</label>
+                <select id="ssid_picker" onchange="onPickNetwork(this)">
+                    <option value="" disabled selected hidden>Select your network</option>
+                    {{network_options + ""}}
+                    <option value="__other__">Other (type below)</option>
+                </select>
+            </div>
+
+            <label for="ssid" id="ssid_label" style="display:{{show_manual}}">Wi-Fi Name (SSID)</label>
+            <input type="text" id="ssid" name="ssid" required style="display:{{show_manual}}">
 
             <label for="password">Wi-Fi Password</label>
             <input type="text" id="password" name="password" required>
@@ -122,6 +132,45 @@ button {
             <button type="submit">Save &amp; Connect</button>
         </form>
     </div>
+<script>
+    function onPickNetwork(sel) {
+        var input = document.getElementById('ssid');
+        var label = document.getElementById('ssid_label');
+        if (sel.value === '__other__') {
+            input.value = '';
+            input.style.display = 'block';
+            label.style.display = 'block';
+            input.focus();
+        } else if (sel.value === '') {
+            input.value = '';
+            input.style.display = 'none';
+            label.style.display = 'none';
+        } else {
+            input.value = sel.value;
+            input.style.display = 'none';
+            label.style.display = 'none';
+        }
+    }
+
+    document.getElementById('cfg').addEventListener('submit', function(e) {
+        var sel = document.getElementById('ssid_picker');
+        var input = document.getElementById('ssid');
+        if (sel.value === '' ) {
+            e.preventDefault();
+            sel.focus();
+            return;
+        }
+        if (sel.value !== '__other__') {
+            input.value = sel.value;
+        }
+        if (!input.value.trim()) {
+            e.preventDefault();
+            input.style.display = 'block';
+            document.getElementById('ssid_label').style.display = 'block';
+            input.focus();
+        }
+    });
+</script>
 </body>
 
 </html>

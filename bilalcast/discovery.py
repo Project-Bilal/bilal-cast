@@ -110,16 +110,18 @@ def cast_url(url, host, port, max_retries=3):
     last_error = "transport_id timeout"
     for attempt in range(1, max_retries + 1):
         cc = None
+        ok = False
         try:
             cc = Chromecast(host, port)
             if cc.play_url(url):
+                ok = True
                 return True, None
             log("Cast attempt {}/{}: transport_id timeout".format(attempt, max_retries))
         except Exception as e:
             last_error = str(e)
             log("Cast attempt {}/{} failed: {}".format(attempt, max_retries, e))
         finally:
-            if cc:
+            if cc and not ok:
                 cc.disconnect()
         if attempt < max_retries:
             time.sleep(3)

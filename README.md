@@ -20,12 +20,25 @@ The device uses a captive portal for onboarding — no app required.
 2. It will create a Wi-Fi access point named **"Bilal Cast Onboarding"**
 3. Connect to that network from your phone or computer
 4. Navigate to `http://bilalcast.net` — you'll be redirected automatically
-5. Fill in your Wi-Fi name, password, and the name of your Chromecast device (found in the Google Home app under device settings)
+5. Select your Wi-Fi network from the dropdown (scanned automatically) or choose "Other" to type it manually. Enter your password and the name of your Chromecast device (found in the Google Home app under device settings)
 6. Tap **Save & Connect** — the device will reboot and begin normal operation
 
 ## Factory reset
 
 Hold the **BOOTSEL** button for 10 seconds while the device is booting. The LED will go solid then resume blinking to confirm. The device will clear its config and reopen the captive portal.
+
+## Building the firmware
+
+The UF2 firmware is built via Docker. Requires Docker installed and running.
+
+```bash
+docker build -t bilalcast-rp2 -f Dockerfile.micropython.1.24.rp2 .
+docker run -v $(pwd):/tmp/bilalcast-build bilalcast-rp2
+```
+
+Flash the output UF2 to the Pico W by holding BOOTSEL while plugging it in, then copying the file to the mounted drive.
+
+If you have Claude Code, you can use the `/build` skill as a shortcut — it runs both commands for you.
 
 ## Hardware
 

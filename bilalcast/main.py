@@ -3,6 +3,7 @@ import network
 import utime as time
 import ujson as json
 import ntptime
+import os
 
 import bilalcast.logger as logger
 from bilalcast.logger import log, send_ntfy
@@ -11,6 +12,8 @@ from bilalcast.discovery import resolve_cast_device, cast_url
 
 # USER CONFIGURED DATA
 DEBUG = False  # True = print to console, False = send via ntfy
+
+ACTIVATION_URL = "https://translate.google.com/translate_tts?client=tw-ob&tl=en&q=Salaam+Alaykum,+This+is+Belaal+Cast.+You+will+hear+the+adthaan+on+this+device."
 
 CONFIG_FILE = "config.json"
 
@@ -115,9 +118,10 @@ def connect_to_wifi_with_retries(ssid, password, *, max_retries=100, timeout_sec
                 time.sleep(1)
 
             if wlan.isconnected() and wlan.status() == network.STAT_GOT_IP:
-                log("connected to wifi: " + str(wlan.ifconfig()))
+                ip = wlan.ifconfig()[0]
+                log("connected to wifi: " + ip)
                 time.sleep(2)
-                return wlan.ifconfig()[0]
+                return ip
 
         except Exception as e:
             log("Wi-Fi error on attempt {}/{}: {}".format(attempt, max_retries, e))
@@ -129,15 +133,13 @@ def connect_to_wifi_with_retries(ssid, password, *, max_retries=100, timeout_sec
     machine.reset()
 
 
-def set_rtc():
-    host_idx = 0
-    while True:
+def set_rtc(max_attempts=20):
+    for host_idx in range(max_attempts):
         ntptime.host = _NTP_HOSTS[host_idx % len(_NTP_HOSTS)]
         try:
             ntptime.settime()
         except Exception as e:
             log("NTP sync failed ({}), trying next host: {}".format(ntptime.host, str(e)))
-            host_idx += 1
             time.sleep(2)
             continue
 
@@ -147,8 +149,11 @@ def set_rtc():
             return
 
         log("RTC year implausible ({}), trying next host...".format(year))
-        host_idx += 1
         time.sleep(2)
+
+    log("NTP failed after {} attempts; resetting.".format(max_attempts))
+    time.sleep(1)
+    machine.reset()
 
 
 def ensure_wifi():
@@ -167,8 +172,6 @@ def main():
 
     if check_factory_reset():
         log("Factory reset confirmed, clearing config...")
-        import os
-
         for f in (CONFIG_FILE, "cast_device.json"):
             try:
                 os.remove(f)
@@ -193,6 +196,12 @@ def main():
     PASSWORD = config["password"]
     CAST_DEVICE_NAME = config["cast_device_name"]
 
+    try:
+        os.stat("cast_device.json")
+        first_connection = False
+    except OSError:
+        first_connection = True
+
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD)
     logger.configure(DEBUG, CAST_DEVICE_NAME)  # switch to configured mode now that WiFi is up
     set_rtc()
@@ -200,6 +209,10 @@ def main():
     cast_host, cast_port = resolve_cast_device(local_ip, CAST_DEVICE_NAME)
     log("cast device: {}:{}".format(cast_host, cast_port))
     led_solid()
+
+    if first_connection:
+        log("First connection — playing activation message")
+        cast_url(ACTIVATION_URL, cast_host, cast_port)
 
     t = time.localtime()
     send_ntfy(
@@ -236,6 +249,7 @@ def main():
     else:
         send_ntfy("cast failed: {} — {}".format(label, cast_error), priority=5, tags=["warning"])
 
+    time.sleep(200)
     machine.reset()
 
 

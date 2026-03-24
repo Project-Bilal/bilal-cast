@@ -1,11 +1,9 @@
 import machine, gc  # pyright: ignore[reportMissingImports]
 
 LOG_INFO = 0b00001
-LOG_WARNING = 0b00010
 LOG_ERROR = 0b00100
 LOG_DEBUG = 0b01000
-LOG_EXCEPTION = 0b10000
-LOG_ALL = LOG_INFO | LOG_WARNING | LOG_ERROR | LOG_DEBUG | LOG_EXCEPTION
+LOG_ALL = LOG_INFO | LOG_ERROR | LOG_DEBUG
 
 _logging_types = LOG_ALL
 
@@ -26,11 +24,6 @@ def info(*items):
         log("info", " ".join(map(str, items)))
 
 
-def warn(*items):
-    if _logging_types & LOG_WARNING:
-        log("warning", " ".join(map(str, items)))
-
-
 def error(*items):
     if _logging_types & LOG_ERROR:
         log("error", " ".join(map(str, items)))
@@ -39,8 +32,3 @@ def error(*items):
 def debug(*items):
     if _logging_types & LOG_DEBUG:
         log("debug", " ".join(map(str, items)))
-
-
-def exception(*items):
-    if _logging_types & LOG_EXCEPTION:
-        log("exception", " ".join(map(str, items)))
