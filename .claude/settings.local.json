@@ -23,7 +23,8 @@
       "Bash(ls -lh /Users/omars/stash/bilal-cast/build*/*.uf2)",
       "Bash(docker build *)",
       "Bash(docker run *)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

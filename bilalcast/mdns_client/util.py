@@ -16,7 +16,7 @@ def dotted_ip_to_bytes(ip: str) -> bytes:
     return bytes(ip_ints)
 
 
-def bytes_to_dotted_ip(a: "Iterable[int]") -> str:
+def bytes_to_dotted_ip(a) -> str:
     """
     Convert four bytes into a dotted IPv4 address string, without any
     sanity checks
@@ -24,7 +24,7 @@ def bytes_to_dotted_ip(a: "Iterable[int]") -> str:
     return ".".join(str(i) for i in a)
 
 
-def check_name(n: str) -> "List[bytes]":
+def check_name(n):
     """
     Ensure that a name is in the form of a list of encoded blocks of
     bytes, typically starting as a qualified domain name
@@ -37,7 +37,7 @@ def check_name(n: str) -> "List[bytes]":
     return n
 
 
-def string_packed_len(byte_list: "List[bytes]") -> int:
+def string_packed_len(byte_list) -> int:
     return sum(len(i) + 1 for i in byte_list) + 1
 
 
@@ -48,7 +48,7 @@ def name_to_bytes(name: str) -> bytes:
     return buffer
 
 
-def pack_name(buffer: bytes, string: "List[bytes]") -> None:
+def pack_name(buffer: bytearray, string) -> None:
     """
     Pack a string into the start of the buffer
     We don't support writing with name compression, BIWIOMS
@@ -75,11 +75,11 @@ def might_have_repeatable_payload(record_type: int) -> bool:
     return record_type in (TYPE_NS, TYPE_CNAME, TYPE_PTR, TYPE_SOA, TYPE_MX, TYPE_SRV)
 
 
-def byte_count_of_lists(*list_of_lists: "Iterable[bytes]") -> int:
+def byte_count_of_lists(*list_of_lists) -> int:
     return sum(sum(len(item) for item in byte_list) for byte_list in list_of_lists)
 
 
-def fill_buffer(buffer: bytes, item: bytes, offset: int) -> int:
+def fill_buffer(buffer: bytearray, item: bytes, offset: int) -> int:
     end_offset = offset + len(item)
     buffer[offset:end_offset] = item
     return end_offset
@@ -109,11 +109,11 @@ def bytes_to_name(data: bytes) -> str:
     return name_list_to_name(item)
 
 
-def name_list_to_name(data: "List[str]") -> str:
+def name_list_to_name(data) -> str:
     return ".".join(data)
 
 
-def bytes_to_name_list(data: bytes) -> "List[str]":
+def bytes_to_name_list(data: bytes):
     index = 0
     item = []
     data_length = len(data)
@@ -140,7 +140,7 @@ async def set_after_timeout(event: uasyncio.Event, timeout: float):
     event.set()
 
 
-def txt_data_to_bytes(txt_data: "Dict[str, Union[str, List[str]]]") -> bytes:
+def txt_data_to_bytes(txt_data) -> bytes:
     payload = b""
     for key, values in txt_data.items():
         if isinstance(values, str):

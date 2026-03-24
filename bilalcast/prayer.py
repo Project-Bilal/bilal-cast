@@ -13,6 +13,7 @@ ATHANS = {
     "Maghrib": ATHAN,
     "Isha": ATHAN,
 }
+ATHANS_ORDER = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 
 
 def pre_athan_time(hhmm):
@@ -50,11 +51,9 @@ def get_location():
         time.sleep(2)
 
 
-def get_next_prayer(lat, lon):
-    ct = time.localtime()
-    date = "{:02d}-{:02d}-{:04d}".format(ct[2], ct[1], ct[0])
+def _fetch_timings(date, lat, lon):
     url = (
-        "https://api.aladhan.com/v1/nextPrayer/" + date
+        "https://api.aladhan.com/v1/timings/" + date
         + "?latitude={:.4f}".format(lat)
         + "&longitude={:.4f}".format(lon)
         + "&latitudeAdjustmentMethod=1"
@@ -62,21 +61,45 @@ def get_next_prayer(lat, lon):
         + "&method=2"
         + "&timezonestring=UTC"
     )
+    resp = urequests.get(url)
+    try:
+        d = resp.json()
+    finally:
+        resp.close()
+    return d
+
+
+def get_next_prayer(lat, lon):
     while True:
         try:
-            resp = urequests.get(url)
-            try:
-                resp_json = resp.json()
-            finally:
-                resp.close()
-            if resp_json.get("code") == 200:
-                timings = resp_json["data"]["timings"]
-                for prayer, prayer_time in timings.items():
-                    if prayer in ATHANS:
-                        prayer_time = prayer_time[:5]
-                        log("next prayer: {} {}".format(prayer, prayer_time))
-                        return prayer, prayer_time
-                log("No known prayer in response, retrying...")
+            ct = time.localtime()
+            now_mins = ct[3] * 60 + ct[4]
+            date = "{:02d}-{:02d}-{:04d}".format(ct[2], ct[1], ct[0])
+            d = _fetch_timings(date, lat, lon)
+            if d.get("code") == 200:
+                timings = d["data"]["timings"]
+                for prayer in ATHANS_ORDER:
+                    t = timings.get(prayer, "")[:5]
+                    if not t:
+                        continue
+                    h, m = t.split(":")
+                    if int(h) * 60 + int(m) > now_mins:
+                        log("next prayer: {} {}".format(prayer, t))
+                        return prayer, t
+                # All today's prayers have passed — fetch tomorrow's first
+                tomorrow = time.localtime(time.mktime(ct) + 86400)
+                date2 = "{:02d}-{:02d}-{:04d}".format(tomorrow[2], tomorrow[1], tomorrow[0])
+                d2 = _fetch_timings(date2, lat, lon)
+                if d2.get("code") == 200:
+                    timings2 = d2["data"]["timings"]
+                    for prayer in ATHANS_ORDER:
+                        t = timings2.get(prayer, "")[:5]
+                        if t:
+                            log("next prayer (tomorrow): {} {}".format(prayer, t))
+                            return prayer, t
+                log("No known prayer found, retrying...")
+            else:
+                log("Timings fetch failed (code {}), retrying...".format(d.get("code")))
         except Exception as e:
             log("Next prayer fetch failed, retrying: " + str(e))
         time.sleep(2)

@@ -13,9 +13,9 @@ class ServiceResponse(SRVMixin):
         self.target = target
         self.ips = set()
         self.txt_records = None
-        self.invalid_at = None
-        self.refreshed_at = None
-        self.ttl = None
+        self.invalid_at: int | None = None
+        self.refreshed_at: int | None = None
+        self.ttl: int | None = None
 
     def __repr__(self) -> str:
         if self.txt_records is None:
@@ -32,7 +32,7 @@ class ServiceResponse(SRVMixin):
             result = result ^ hash(getattr(self, attribute))
         return result
 
-    def __eq__(self, other: "ServiceResponse") -> bool:
+    def __eq__(self, other) -> bool:
         if not isinstance(other, ServiceResponse):
             return False
 
@@ -43,7 +43,7 @@ class ServiceResponse(SRVMixin):
         return True
 
     @property
-    def ttl_ms(self) -> "Optional[int]":
+    def ttl_ms(self):
         if self.ttl is None:
             return None
 
@@ -57,7 +57,7 @@ class ServiceResponse(SRVMixin):
             return True
 
         difference = self.invalid_at - timing
-        ttl_suggests_refresh = difference < self.ttl_ms / 2
+        ttl_suggests_refresh = difference < self.ttl * 500
 
         if not ttl_suggests_refresh or self.refreshed_at is None:
             return ttl_suggests_refresh
@@ -72,7 +72,7 @@ class ServiceResponse(SRVMixin):
 
         return timing >= self.invalid_at
 
-    async def refresh_with(self, client: "Client") -> None:
+    async def refresh_with(self, client) -> None:
         self.refreshed_at = time.ticks_ms()
         if client.stopped:
             return

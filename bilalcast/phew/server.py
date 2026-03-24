@@ -41,7 +41,7 @@ class Request:
         self.method = method
         self.uri = uri
         self.protocol = protocol
-        self.form = {}
+        self.form: dict | None = {}
         self.data = {}
         self.query = {}
         self.headers = {}
@@ -280,7 +280,10 @@ class Phew:
             response = Response(body, status=status)
             response.add_header("Content-Type", content_type)
             if hasattr(body, "__len__"):
-                response.add_header("Content-Length", len(body))
+                response.add_header("Content-Length", len(body))  # type: ignore[arg-type]
+
+        if response is None:
+            return
 
         # write status line
         status_message = status_message_map.get(response.status, "Unknown")
@@ -304,7 +307,7 @@ class Phew:
                     await writer.drain()
         elif type(response.body).__name__ == "generator":
             # generator
-            for chunk in response.body:
+            for chunk in response.body:  # type: ignore[union-attr]
                 writer.write(chunk)
                 await writer.drain()
         else:

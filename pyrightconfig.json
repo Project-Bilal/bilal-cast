@@ -1,0 +1,7 @@
+{
+  "stubPath": "./typings",
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none",
+  "disableBytesTypePromotions": false,
+  "exclude": ["**/mdns_client/**"]
+}

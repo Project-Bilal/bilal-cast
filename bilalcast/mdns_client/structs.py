@@ -16,7 +16,7 @@ from bilalcast.mdns_client.util import (
 
 class DNSQuestion(namedtuple("DNSQuestion", ["query", "type", "query_class"])):
     @property
-    def checked_query(self) -> "List[bytes]":
+    def checked_query(self):
         return check_name(self.query)
 
     def to_bytes(self) -> bytes:
@@ -29,7 +29,7 @@ class DNSQuestion(namedtuple("DNSQuestion", ["query", "type", "query_class"])):
 
 
 class DNSQuestionWrapper(namedtuple("DNSQuestionWrapper", ["questions"])):
-    questions: "List[DNSQuestion]"
+    questions: list
 
     def to_bytes(self) -> bytes:
         question_bytes = [question.to_bytes() for question in self.questions]
@@ -52,7 +52,7 @@ class DNSRecord(namedtuple("DNSRecord", ["name", "record_type", "query_class", "
     rdata: bytes
 
     @property
-    def checked_name(self) -> "List[bytes]":
+    def checked_name(self):
         return check_name(self.name)
 
     def to_bytes(self) -> bytes:
@@ -80,10 +80,10 @@ class DNSResponse(
 ):
     transaction_id: int
     message_type: int
-    questions: "List[DNSQuestion]"
-    answers: "List[DNSRecord]"
-    authorities: "List[DNSRecord]"
-    additional: "List[DNSRecord]"
+    questions: list
+    answers: list
+    authorities: list
+    additional: list
 
     @property
     def is_response(self) -> bool:
@@ -94,7 +94,7 @@ class DNSResponse(
         return not self.is_response
 
     @property
-    def records(self) -> "Iterable[DNSRecord]":
+    def records(self):
         yield from self.answers
         yield from self.authorities
         yield from self.additional
@@ -152,7 +152,7 @@ class SRVMixin:
 
 class SRVRecord(namedtuple("SRVRecord", ["name", "priority", "weight", "port", "target"]), SRVMixin):
     @classmethod
-    def from_dns_record(cls, dns_record: DNSRecord) -> "SRVRecord":
+    def from_dns_record(cls, dns_record: DNSRecord):
         name = dns_record.name
         priority, weight, port = unpack_from("!HHH", dns_record.rdata, 0)
         target = bytes_to_name(dns_record.rdata[6:]).lower()

@@ -6,7 +6,7 @@ from bilalcast.mdns_client.util import bytes_to_name_list
 TYPE_KEYS = (TYPE_PTR, TYPE_SRV, TYPE_A, TYPE_TXT)
 
 
-def sort_record_by_type(response: DNSResponse) -> int:
+def sort_record_by_type(response: DNSRecord) -> int:
     if response.record_type in TYPE_KEYS:
         return TYPE_KEYS.index(response.record_type)
     return -1
@@ -18,7 +18,7 @@ class TXTServiceDiscovery(ServiceDiscovery):
         if record.record_type == TYPE_TXT:
             self._on_txt_record(record)
 
-    def _records_of(self, response: DNSResponse) -> "Iterable[DNSRecord]":
+    def _records_of(self, response: DNSResponse):
         return sorted(super()._records_of(response), key=sort_record_by_type)
 
     def _on_txt_record(self, record: DNSRecord) -> None:

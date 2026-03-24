@@ -11,7 +11,7 @@ MDNSPacketHeader = namedtuple(
 )
 
 
-def parse_packet(buffer: bytes) -> "Optional[DNSResponse]":
+def parse_packet(buffer: bytes):
     packet_parser = PacketParser(buffer)
     return packet_parser.parse()
 
@@ -23,7 +23,7 @@ class PacketParser:
         self.header = MDNSPacketHeader(*self._unpack("!HHHHHH", 6))
         self.index = 12
 
-    def parse(self) -> "Optional[DNSResponse]":
+    def parse(self):
         questions = self.parse_questions()
         answers = self.parse_answers()
         authorities = self.parse_authorities()
@@ -37,7 +37,7 @@ class PacketParser:
             additionals,
         )
 
-    def parse_questions(self) -> "List[DNSQuestion]":
+    def parse_questions(self):
         return [self.parse_question() for _ in range(self.header.num_questions)]
 
     def parse_question(self) -> DNSQuestion:
@@ -45,7 +45,7 @@ class PacketParser:
         type_query, query_class = self._unpack("!HH", 4)
         return DNSQuestion(record_name, type_query, query_class)
 
-    def parse_records(self, num_records: int) -> "List[DNSRecord]":
+    def parse_records(self, num_records: int):
         return [self.parse_record() for _ in range(num_records)]
 
     def parse_record(self) -> DNSRecord:
@@ -104,13 +104,13 @@ class PacketParser:
             payload += byte_entry
         return payload
 
-    def parse_answers(self) -> "List[DNSRecord]":
+    def parse_answers(self):
         return self.parse_records(self.header.num_answers)
 
-    def parse_authorities(self) -> "List[DNSRecord]":
+    def parse_authorities(self):
         return self.parse_records(self.header.num_authorities)
 
-    def parse_additionals(self) -> List[DNSRecord]:
+    def parse_additionals(self) -> list[DNSRecord]:
         return self.parse_records(self.header.num_additional)
 
     def _parse_record_name(self) -> str:
@@ -165,7 +165,7 @@ class PacketParser:
         self.index = end_index
         return data
 
-    def _unpack(self, format: str, length: int) -> "Tuple[Any]":
+    def _unpack(self, format: str, length: int):
         unpacked = struct.unpack_from(format, self.buffer, self.index)
         self.index += length
         return unpacked

@@ -82,6 +82,7 @@ class Chromecast(object):
 
     def _send(self, data):
         """sendall for SSL sockets (write may be partial)."""
+        assert self.s is not None
         mv = memoryview(data)
         total = 0
         while total < len(data):
@@ -93,6 +94,7 @@ class Chromecast(object):
 
     def _read_exact(self, n):
         """Read exactly n bytes or raise."""
+        assert self.s is not None
         chunks = bytearray()
         got = 0
         while got < n:

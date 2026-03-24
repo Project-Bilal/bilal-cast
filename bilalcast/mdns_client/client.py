@@ -8,16 +8,11 @@ import uasyncio
 
 from bilalcast.mdns_client.constants import CLASS_IN, LOCAL_MDNS_SUFFIX, MAX_PACKET_SIZE, MDNS_ADDR, MDNS_PORT, TYPE_A
 from bilalcast.mdns_client.parser import parse_packet
-from bilalcast.mdns_client.structs import DNSQuestion, DNSQuestionWrapper, DNSRecord, DNSResponse
+from bilalcast.mdns_client.structs import DNSQuestion, DNSQuestionWrapper, DNSResponse
 from bilalcast.mdns_client.util import a_record_rdata_to_string, dotted_ip_to_bytes, set_after_timeout
 
 
 class Callback(namedtuple("Callback", ["id", "callback", "remove_if", "timeout", "created_ticks"])):
-    id: int
-    callback: "Callable[[DNSResponse], Awaitable[None]]"
-    remove_if: "Optional[Callable[[DNSResponse], Awaitable[bool]]]"
-    timeout: "Optional[float]"
-    created_ticks: int
 
     @property
     def timedout(self) -> bool:
@@ -29,20 +24,20 @@ class Callback(namedtuple("Callback", ["id", "callback", "remove_if", "timeout",
 
 class Client:
     def __init__(self, local_addr: str, debug: bool = False):
-        self.socket: "Optional[socket.socket]" = None
+        self.socket: socket.socket | None = None
         self.local_addr = local_addr
         self.debug = debug
         self.print_packets = debug
         self.stopped = True
-        self.callbacks: "Dict[int, Callback]" = {}
+        self.callbacks: dict = {}
         self.callback_fd_count: int = 0
         self.mdns_timeout = 2.0
 
     def add_callback(
         self,
-        callback: "Callable[[DNSResponse], Awaitable[None]]",
-        remove_if: "Optional[Callable[[DNSResponse], Awaitable[bool]]]" = None,
-        timeout: "Optional[int]" = None,
+        callback,
+        remove_if=None,
+        timeout=None,
     ) -> Callback:
         callback_config = Callback(
             id=self.callback_fd_count,
@@ -98,12 +93,12 @@ class Client:
 
     async def process_waiting_data(self) -> None:
         while not self.stopped:
-            readers, _, _ = select([self.socket], [], [], 0)
+            readers, _, _ = select([self.socket], [], [], 0)  # type: ignore[list-item]
             if not readers:
                 break
 
             try:
-                buffer, addr = self.socket.recvfrom(MAX_PACKET_SIZE)
+                buffer, addr = self.socket.recvfrom(MAX_PACKET_SIZE)  # type: ignore[union-attr]
             except MemoryError:
                 # This seems to happen here without SPIRAM sometimes.
                 self.dprint(
@@ -131,14 +126,14 @@ class Client:
         else:
             loop = uasyncio.get_event_loop()
             for callback in self.callbacks.values():
-                loop.create_task(callback.callback(parsed_packet))
+                loop.create_task(callback.callback(parsed_packet))  # type: ignore[operator]
                 if callback.timedout:
                     self.remove_if_present(callback)
                 elif callback.remove_if is not None:
                     loop.create_task(self.remove_if_check(callback, parsed_packet))
 
     async def remove_if_check(self, callback: Callback, message: DNSResponse) -> None:
-        if await callback.remove_if(message):
+        if await callback.remove_if(message):  # type: ignore[operator]
             return self.remove_if_present(callback)
 
     def remove_if_present(self, callback: Callback) -> None:
@@ -167,14 +162,14 @@ class Client:
     def _send_bytes(self, payload: bytes) -> None:
         self._init_socket_if_not_done()
         try:
-            self.socket.sendto(payload, (MDNS_ADDR, MDNS_PORT))
+            self.socket.sendto(payload, (MDNS_ADDR, MDNS_PORT))  # type: ignore[union-attr]
         except OSError:
             # This sendto function sometimes returns an OSError with EBADF
             # as a payload. To avoid a failure here, reiinitialize the socket
             # and try again once.
             self._close_socket()
             self._init_socket()
-            self.socket.sendto(payload, (MDNS_ADDR, MDNS_PORT))
+            self.socket.sendto(payload, (MDNS_ADDR, MDNS_PORT))  # type: ignore[union-attr]
 
     def _init_socket_if_not_done(self) -> None:
         if self.socket is None:
@@ -182,13 +177,13 @@ class Client:
 
     async def getaddrinfo(
         self,
-        host: "Union[str, bytes, bytearray]",
-        port: "Union[str, int, None]",
+        host,
+        port,
         family: int = 0,
         type: int = 0,
         proto: int = 0,
         flags: int = 0,
-    ) -> "List[Tuple[int, int, int, str, Tuple[str, int]]]":
+    ):
         hostcheck = host
         while hostcheck.endswith("."):
             hostcheck = hostcheck[:-1]
@@ -199,7 +194,7 @@ class Client:
             self.dprint("Resolving dns request host {} and port {}".format(host, port))
             return socket.getaddrinfo(host, port, family, type, proto, flags)
 
-    async def mdns_getaddr(self, host: str) -> Tuple[str, str]:
+    async def mdns_getaddr(self, host: str):
         host = host.lower()
         self.dprint("Resolving mdns request host {}".format(host))
         response = self.scan_for_response(TYPE_A, host, self.mdns_timeout)
@@ -211,8 +206,8 @@ class Client:
 
         return record.name, a_record_rdata_to_string(record.rdata)
 
-    async def scan_for_response(self, expected_type: int, name: str, timeout: float = 1.5) -> "Optional[DNSRecord]":
-        def matching_record(dns_response: DNSResponse) -> "Optional[DNSRecord]":
+    async def scan_for_response(self, expected_type: int, name: str, timeout: float = 1.5):
+        def matching_record(dns_response: DNSResponse):
             for record in dns_response.records:
                 if record.record_type == expected_type and record.name == name:
                     return record
