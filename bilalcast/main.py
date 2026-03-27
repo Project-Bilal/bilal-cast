@@ -395,6 +395,15 @@ async def main():
     logger.configure(DEBUG, CAST_DEVICE_NAME)
     logger.load_log(LOG_FILE)
 
+    try:
+        from bilalcast.ota import check_and_update
+        if check_and_update():
+            log("OTA update applied, rebooting...")
+            time.sleep(1)
+            machine.reset()
+    except Exception as e:
+        warn("OTA check failed: " + str(e))
+
     geo_lat, geo_lon, utc_offset, tz_string = get_location()
     _tz_string = tz_string
     set_rtc()

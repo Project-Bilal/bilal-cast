@@ -28,7 +28,6 @@ RUN git clone https://github.com/micropython/micropython && \
     'pygdbmi<=0.9.0.2' \
     'kconfiglib==13.7.1' \
     'bitstring>=3.1.6,<4' && \
-    pip install freezefs==2.4 && \
     mkdir -p /tmp/bilalcast-build
 
 WORKDIR /opt/app/micropython
@@ -45,32 +44,15 @@ RUN git submodule update --init -- lib/pico-sdk lib/tinyusb
 
 WORKDIR /opt/app/micropython/ports/rp2
 
-# --- Freeze code --------------------------------------------------------
-# Copy your bilalcast package (contains /src/bilalcast/main.py etc.)
-ADD bilalcast modules/bilalcast 
-RUN rm -rf modules/bilalcast/www      
+# --- Freeze only infrastructure modules (not app modules) ---
+ADD bilalcast/phew              modules/bilalcast/phew
+ADD bilalcast/captive_portal.py modules/bilalcast/captive_portal.py
+ADD bilalcast/logger.py         modules/bilalcast/logger.py
+ADD bilalcast/ota.py            modules/bilalcast/ota.py
+ADD bilalcast/mdns_client       modules/bilalcast/mdns_client
 
-# Create a tiny frozen main.py that runs your bilalcast.main on boot
-RUN printf '%s\n' \
-    "try:" \
-    "    import www_fs  # mounts /www if present" \
-    "except Exception:" \
-    "    pass" \
-    "try:" \
-    "    import bilalcast.main" \
-    "except Exception as e:" \
-    "    import sys" \
-    "    sys.print_exception(e)" \
-    "    import machine, time" \
-    "    time.sleep(5)" \
-    "    machine.reset()" \
-    > modules/main.py                        
-
-# --- Freeze web assets as a compressed VFS -------------------
-ADD bilalcast/www /opt/app/www                  
-RUN python -m freezefs /opt/app/www /opt/app/www_fs.py \
-    --on-import=mount --target /www --compress && rm -rf /opt/app/www
-RUN cp /opt/app/www_fs.py modules/www_fs.py
+# --- Frozen bootstrap entry point ---
+ADD _bootstrap.py modules/main.py
 
 ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
 
