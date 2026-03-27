@@ -20,7 +20,7 @@ from bilalcast.prayer import (
     ATHANS_ORDER,
     PRE_ATHAN,
 )
-from bilalcast.discovery import resolve_cast_device, cast_url, start_mdns_responder
+from bilalcast.discovery import resolve_cast_device, cast_url, start_mdns_responder, list_cast_devices
 from bilalcast.status import start_status_server
 
 # USER CONFIGURED DATA
@@ -30,7 +30,6 @@ ACTIVATION_URL = "https://translate.google.com/translate_tts?client=tw-ob&tl=en&
 
 CONFIG_FILE = "config.json"
 CAST_STATE_FILE = "cast_state.json"
-LOG_FILE = "bilalcast.log"
 
 # Runtime config — populated from CONFIG_FILE at boot
 SSID = None
@@ -69,6 +68,7 @@ state = {
     "boot_epoch": 0,
     "device_name": None,
     "hostname": "bilalcast",
+    "cast_devices": [],
 }
 
 
@@ -272,7 +272,6 @@ def _save_cast_state(ok, label):
             json.dump({"ok": ok, "label": label}, f)
     except Exception as e:
         error("cast state save failed: " + str(e))
-    logger.flush_log(LOG_FILE)
 
 
 async def do_cast(url, label):
@@ -349,7 +348,6 @@ async def run_schedule():
         state["lon"] = lon
         state["prayer_times"] = _get_prayer_times(lat, lon, CALC_METHOD, _tz_string)
         log("Prayer times refreshed for new day")
-        logger.flush_log(LOG_FILE)
 
 
 async def main():
@@ -361,7 +359,7 @@ async def main():
 
     if check_factory_reset():
         log("Factory reset confirmed, clearing config...")
-        for f in (CONFIG_FILE, "cast_device.json", CAST_STATE_FILE, LOG_FILE):
+        for f in (CONFIG_FILE, "cast_device.json", CAST_STATE_FILE):
             try:
                 os.remove(f)
             except Exception:
@@ -393,7 +391,24 @@ async def main():
 
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD, hostname=DEVICE_HOSTNAME)
     logger.configure(DEBUG, CAST_DEVICE_NAME)
-    logger.load_log(LOG_FILE)
+
+    # Populate state and start HTTP server immediately after WiFi so the
+    # status page is reachable as soon as possible. Remaining boot steps
+    # (OTA, NTP, location, prayer times) fill in the state afterwards.
+    state["local_ip"] = local_ip
+    state["device_name"] = CAST_DEVICE_NAME
+    state["hostname"] = DEVICE_HOSTNAME
+    state["boot_epoch"] = time.time()
+    try:
+        with open(CAST_STATE_FILE) as f:
+            cs = json.load(f)
+        state["last_cast_ok"] = cs.get("ok")
+        state["last_cast_label"] = cs.get("label")
+    except Exception:
+        pass
+
+    start_status_server(state, PRE_ATHAN_MINS, CALC_METHOD, CONFIG_FILE, ACTIVATION_URL, do_cast, local_ip)
+    start_mdns_responder(local_ip, local_ip)
 
     try:
         from bilalcast.ota import check_and_update
@@ -409,24 +424,6 @@ async def main():
     set_rtc()
     if utc_offset:
         adjust_rtc(utc_offset)
-
-    # Populate state early so HTTP server can render on first request
-    state["local_ip"] = local_ip
-    state["device_name"] = CAST_DEVICE_NAME
-    state["hostname"] = DEVICE_HOSTNAME
-    state["boot_epoch"] = time.time()
-    try:
-        with open(CAST_STATE_FILE) as f:
-            cs = json.load(f)
-        state["last_cast_ok"] = cs.get("ok")
-        state["last_cast_label"] = cs.get("label")
-    except Exception:
-        pass
-
-    # Start HTTP server and mDNS responder before cast discovery so they're
-    # reachable during the mDNS scan (which can take up to ~33s)
-    start_status_server(state, PRE_ATHAN_MINS, CALC_METHOD, CONFIG_FILE, LOG_FILE, ACTIVATION_URL, do_cast)
-    start_mdns_responder(local_ip, local_ip)
 
     cast_host, cast_port = await resolve_cast_device(local_ip, CAST_DEVICE_NAME)
     if cast_host:

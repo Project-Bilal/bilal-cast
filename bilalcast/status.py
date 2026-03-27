@@ -5,7 +5,6 @@ import time
 import machine  # pyright: ignore[reportMissingImports]
 import network  # pyright: ignore[reportMissingImports]
 
-import bilalcast.logger as logger
 from bilalcast.phew import server
 from bilalcast.phew.template import render_template
 from bilalcast.prayer import ATHANS_ORDER
@@ -75,9 +74,9 @@ def render_status(state):
     else:
         lc = "none yet"
     if state["cast_host"]:
-        cast_status = "<span class=ok>&#10003; Found</span>"
+        cast_status = "<span class=ok>Found &#10003;</span>"
     else:
-        cast_status = "<span class=fl>&#9888; Not found</span>"
+        cast_status = "<span class=fl>Not found &#9888;</span>"
     return render_template(
         "www/status.html",
         device_name=state["device_name"] or "Bilal Cast",
@@ -150,7 +149,7 @@ def save_settings(form, config_file):
     )
 
 
-def start_status_server(state, pre_athan_mins, calc_method, config_file, log_file, activation_url, do_cast):
+def start_status_server(state, pre_athan_mins, calc_method, config_file, activation_url, do_cast, local_ip):
     app = server.Phew()
 
     @app.route("/", methods=["GET"])
@@ -174,30 +173,22 @@ def start_status_server(state, pre_athan_mins, calc_method, config_file, log_fil
     def settings_save(request):
         return save_settings(request.form, config_file)
 
-    @app.route("/logs", methods=["GET"])
-    def logs_page(request):
-        entries = logger.get_log_buffer()
-        rows = ""
-        for ts, level, msg in reversed(entries):
-            css = "wl" if level == "WARN" else ("el" if level == "ERROR" else "il")
-            msg_safe = msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            rows += "<tr class={}>".format(css)
-            rows += "<td class=ts>{}</td><td class=lv>{}</td><td>{}</td></tr>".format(ts, level, msg_safe)
-        return render_template("www/logs.html", rows=rows + "", count=str(len(entries)))
+    @app.route("/cast-devices", methods=["GET"])
+    def cast_devices_route(request):
+        return json.dumps(state.get("cast_devices") or []), 200, "application/json"
 
-    @app.route("/logs/clear", methods=["POST"])
-    def logs_clear(request):
-        logger.clear_log()
-        try:
-            os.remove(log_file)
-        except Exception:
-            pass
+    @app.route("/scan-cast-devices", methods=["POST"])
+    def scan_cast_devices_route(request):
+        from bilalcast.discovery import list_cast_devices
+        async def _scan():
+            names = await list_cast_devices(local_ip)
+            state["cast_devices"] = names
+        asyncio.create_task(_scan())
         return "ok", 200
 
     @app.route("/factory-reset", methods=["POST"])
     def factory_reset_route(request):
-        logger.clear_log()
-        for f in (config_file, "cast_device.json", "cast_state.json", log_file):
+        for f in (config_file, "cast_device.json", "cast_state.json"):
             try:
                 os.remove(f)
             except Exception:

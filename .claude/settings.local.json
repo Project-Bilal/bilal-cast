@@ -30,7 +30,8 @@
       "WebFetch(domain:forums.raspberrypi.com)",
       "Bash(find /Users/omars/stash/bilal-cast -type f -name \"*.py\" -exec grep -l \"responder\\\\|response\" {})",
       "WebFetch(domain:nominatim.org)",
-      "WebFetch(domain:nominatim.openstreetmap.org)"
+      "WebFetch(domain:nominatim.openstreetmap.org)",
+      "WebFetch(domain:api.github.com)"
     ]
   }
 }

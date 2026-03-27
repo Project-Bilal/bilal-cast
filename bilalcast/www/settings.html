@@ -107,7 +107,13 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <div class=c>
 <b>Cast Device</b>
 <label>Device name (as shown in Google Home)</label>
-<input type=text name=cast_device_name value="{{cast_device_name}}" required>
+<input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" required list=cdl>
+<datalist id=cdl></datalist>
+<div style="margin-top:8px">
+<button type=button class=bt onclick="fetch('/test',{method:'POST'}).then(()=>alert('Test sent!'))">Test Speakers</button>
+<button type=button class=bg id=scb onclick="scanDevices()">Scan for Devices</button>
+</div>
+<p id=scs class=hint></p>
 </div>
 <div class=c>
 <button type=submit class=bt>Save &amp; Reboot</button>
@@ -174,6 +180,27 @@ function fmt12(hm){
   if(!hm)return'\u2014';
   var p=hm.split(':'),h=parseInt(p[0]),m=p[1],s=h<12?'AM':'PM';
   h=h%12||12;return h+':'+m+' '+s;
+}
+
+function fillDeviceList(names){
+  var dl=document.getElementById('cdl');
+  dl.innerHTML='';
+  names.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});
+}
+fetch('/cast-devices').then(function(r){return r.json();}).then(fillDeviceList).catch(function(){});
+
+function scanDevices(){
+  var btn=document.getElementById('scb'),st=document.getElementById('scs');
+  btn.disabled=true;st.textContent='Scanning\u2026';
+  fetch('/scan-cast-devices',{method:'POST'}).then(function(){
+    setTimeout(function(){
+      fetch('/cast-devices').then(function(r){return r.json();}).then(function(names){
+        fillDeviceList(names);
+        st.textContent=names.length?'Found '+names.length+' device'+(names.length===1?'':'s')+'.':'No devices found.';
+        btn.disabled=false;
+      }).catch(function(){btn.disabled=false;st.textContent='';});
+    },4500);
+  }).catch(function(){btn.disabled=false;st.textContent='';});
 }
 
 pb.addEventListener('click',function(){

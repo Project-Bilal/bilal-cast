@@ -14,6 +14,7 @@ body{font-family:sans-serif;margin:0;padding:16px;background:#f4f6f9;color:#222}
 .hd{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
 h1{margin:0;font-size:1.3rem;color:#1a73e8}
 .rb{background:none;border:none;cursor:pointer;padding:4px;color:#1a73e8;font-size:1.3rem;line-height:1}
+.rb.spinning{animation:sp .7s linear infinite}
 .c{background:#fff;border-radius:8px;padding:14px;margin:8px 0;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 table{width:100%;border-collapse:collapse}
 td{padding:6px 4px;border-bottom:1px solid #eee;font-size:.95rem}
@@ -35,16 +36,14 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <div id=ptr></div>
 <div class=hd>
 <h1>Bilal Cast</h1>
-<span style="display:flex;align-items:center;gap:4px">{{rssi_svg + ""}}<button class=rb onclick="location.reload()" title=Refresh>&#8635;</button></span>
+<span style="display:flex;align-items:center;gap:4px">{{rssi_svg + ""}}<button class=rb onclick="this.classList.add('spinning');location.reload()" title=Refresh>&#8635;</button></span>
 </div>
 <div class=c>{{local_time}}</div>
 <div class=c>Cast Device: {{device_name}} {{cast_status + ""}}<br>
 Last Call Made: {{lc + ""}}</div>
 <div class=c><table>{{rows + ""}}</table></div>
 <div class=c>
-<button class=bt onclick="fetch('/test',{method:'POST'}).then(()=>alert('Test sent!'))">Test Speakers</button>
 <a href=/settings><button type=button class=bg>Settings</button></a>
-<a href=/logs><button type=button class=bg>Logs</button></a>
 <button class=br onclick="if(confirm('Reset all settings?'))fetch('/factory-reset',{method:'POST'}).then(()=>alert('Resetting...'))">Factory Reset</button>
 <p style='margin:8px 0 0;font-size:.8rem;color:#888'>http://{{hostname}}.local &middot; {{local_ip}}</p>
 </div>
