@@ -138,15 +138,30 @@ class Chromecast(object):
             return False
 
         self._send(_frame(_NS_CONN, b'{"type":"CONNECT"}', dest=transport_id))
+        time.sleep_ms(1000)  # let transport connection settle before sending LOAD
 
         load_payload = (
-            b'{"media":{"contentId":"' + url_b + b'","streamType":"BUFFERED","contentType":"audio/mp3","metadata":'
+            b'{"media":{"contentId":"' + url_b + b'","streamType":"BUFFERED","contentType":"audio/mpeg","metadata":'
             b'{"metadataType":0,"title":"Bilal Cast","thumb":"' + THUMB + b'","images":[{"url":"' + THUMB + b'"}]}},'
             b'"type":"LOAD","autoplay":true,"customData":{},"requestId":4,"sessionId":"' + transport_id + b'"}'
         )
 
         self._send(_frame(_NS_MEDIA, load_payload, dest=transport_id))
-        return True
+        return self._wait_for_load_confirmation(timeout_ms=10000)
+
+    def _wait_for_load_confirmation(self, timeout_ms=10000):
+        """Read messages until MEDIA_STATUS shows BUFFERING/PLAYING, or LOAD_FAILED."""
+        start = self._ticks_ms()
+        while self._ticks_diff(self._ticks_ms(), start) < timeout_ms:
+            try:
+                msg = self.read_message()
+            except OSError:
+                return False
+            if b"LOAD_FAILED" in msg:
+                return False
+            if b'"BUFFERING"' in msg or b'"PLAYING"' in msg:
+                return True
+        return False
 
     def _wait_for_transport_id(self, timeout_ms=4000):
         """Wait until any incoming message contains "transportId":"..."""

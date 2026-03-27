@@ -1,9 +1,11 @@
+import asyncio
 import utime as time
 import ujson as json
-import machine
 
 from bilalcast.cast import Chromecast
 from bilalcast.logger import log
+
+_persistent_client = None
 
 CAST_CACHE_FILE = "cast_device.json"
 
@@ -47,45 +49,44 @@ def _device_reachable(host, port):
                 pass
 
 
-def _mdns_find(local_ip, name):
-    import asyncio
+def start_mdns_responder(local_ip, device_ip):
+    global _persistent_client
+    from bilalcast.mdns_client import Client
+    _persistent_client = Client(local_ip)
+    _persistent_client.enable_responder("bilalcast.local", device_ip)
+
+
+async def _mdns_find(local_ip, name):
     from bilalcast.mdns_client import Client
     from bilalcast.mdns_client.service_discovery.txt_discovery import TXTServiceDiscovery
-
-    async def _scan():
-        discovery = TXTServiceDiscovery(Client(local_ip))
-        for attempt in range(10):
-            try:
-                results = await discovery.query_once("_googlecast", "_tcp", timeout=3)
-                for d in results or ():
-                    try:
-                        fn = d.txt_records.get("fn") or []
-                        found_name = fn[0].strip() if fn else ""
-                    except Exception:
-                        found_name = ""
-                    if found_name.lower() == name.lower():
-                        host = None
-                        for ip in (d.ips or []):
-                            if "." in ip:
-                                host = ip
-                                break
-                        port = int(d.port) if d.port is not None else None
-                        if host and port:
-                            return host, port
-            except Exception as e:
-                log("mDNS attempt {} failed: {}".format(attempt + 1, e))
-            await asyncio.sleep_ms(300)
-        log("mDNS scan failed finding device...")
-        return None, None
-
-    try:
-        return asyncio.run(_scan())
-    except Exception as e:
-        log("mDNS scan error: " + str(e))
-        return None, None
+    client = _persistent_client if _persistent_client is not None else Client(local_ip)
+    discovery = TXTServiceDiscovery(client)
+    for attempt in range(10):
+        try:
+            results = await discovery.query_once("_googlecast", "_tcp", timeout=3)
+            for d in results or ():
+                try:
+                    fn = d.txt_records.get("fn") or []
+                    found_name = fn[0].strip() if fn else ""
+                except Exception:
+                    found_name = ""
+                if found_name.lower() == name.lower():
+                    host = None
+                    for ip in (d.ips or []):
+                        if "." in ip:
+                            host = ip
+                            break
+                    port = int(d.port) if d.port is not None else None
+                    if host and port:
+                        return host, port
+        except Exception as e:
+            log("mDNS attempt {} failed: {}".format(attempt + 1, e))
+        await asyncio.sleep_ms(300)
+    log("mDNS scan failed finding device...")
+    return None, None
 
 
-def resolve_cast_device(local_ip, name):
+async def resolve_cast_device(local_ip, name):
     host, port = _load_cast_cache()
     if host and port:
         log("Cache hit: {}:{}, verifying...".format(host, port))
@@ -95,15 +96,14 @@ def resolve_cast_device(local_ip, name):
         log("Cached device unreachable, scanning mDNS...")
 
     log("Scanning mDNS for '{}'...".format(name))
-    host, port = _mdns_find(local_ip, name)
+    host, port = await _mdns_find(local_ip, name)
     if host and port:
         log("Found via mDNS: {}:{}".format(host, port))
         _save_cast_cache(host, port)
         return host, port
 
-    log("mDNS failed, resetting...")
-
-    machine.reset()
+    log("mDNS scan failed — cast device not found. Proceeding without cast.")
+    return None, None
 
 
 def cast_url(url, host, port, max_retries=3):
@@ -121,7 +121,7 @@ def cast_url(url, host, port, max_retries=3):
             last_error = str(e)
             log("Cast attempt {}/{} failed: {}".format(attempt, max_retries, e))
         finally:
-            if cc and not ok:
+            if cc:
                 cc.disconnect()
         if attempt < max_retries:
             time.sleep(3)

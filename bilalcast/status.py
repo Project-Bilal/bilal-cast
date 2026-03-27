@@ -1,0 +1,213 @@
+import asyncio
+import json
+import os
+import time
+import machine  # pyright: ignore[reportMissingImports]
+import network  # pyright: ignore[reportMissingImports]
+
+import bilalcast.logger as logger
+from bilalcast.phew import server
+from bilalcast.phew.template import render_template
+from bilalcast.prayer import ATHANS_ORDER
+
+
+def _rssi_svg(dbm_str):
+    try:
+        v = int(dbm_str)
+        bars = 3 if v >= -55 else 2 if v >= -70 else 1 if v >= -85 else 0
+    except Exception:
+        bars = -1
+    on = "#1a73e8"
+    off = "#d0d0d0"
+    dot = on if bars > 0 else ("#d93025" if bars == 0 else off)
+    c = [on if i < bars else off for i in range(3)]
+    return (
+        '<svg width="18" height="14" viewBox="0 0 18 14"'
+        ' style="vertical-align:middle;margin-right:3px">'
+        '<circle cx="9" cy="13" r="1.5" fill="' + dot + '"/>'
+        '<path d="M5,10 Q9,6.5 13,10"'
+        ' stroke="' + c[0] + '" stroke-width="2" fill="none" stroke-linecap="round"/>'
+        '<path d="M2.5,7.5 Q9,2 15.5,7.5"'
+        ' stroke="' + c[1] + '" stroke-width="2" fill="none" stroke-linecap="round"/>'
+        '<path d="M0.5,5 Q9,-2 17.5,5"'
+        ' stroke="' + c[2] + '" stroke-width="2" fill="none" stroke-linecap="round"/>'
+        '</svg>'
+    )
+
+
+def _fmt12(hhmm):
+    h, m = hhmm.split(":")
+    h = int(h)
+    suffix = "AM" if h < 12 else "PM"
+    h12 = h % 12 or 12
+    return "{}:{:02d} {}".format(h12, int(m), suffix)
+
+
+def render_status(state):
+    now = time.localtime()
+    hour = now[3]
+    suffix = "AM" if hour < 12 else "PM"
+    hour12 = hour % 12 or 12
+    local_time = "{}:{:02d} {} \u00b7 {:02d}-{:02d}-{:04d}".format(
+        hour12, now[4], suffix, now[1], now[2], now[0]
+    )
+    try:
+        rssi = str(network.WLAN(network.STA_IF).status("rssi"))
+    except Exception:
+        rssi = "?"
+    now_mins = now[3] * 60 + now[4]
+    rows = ""
+    for p in ATHANS_ORDER:
+        t = state["prayer_times"].get(p, "")
+        display = _fmt12(t) if t else "&mdash;"
+        if p == state["next_prayer"]:
+            css = " class=nx"
+        elif t:
+            h, m = t.split(":")
+            css = " class=ps" if int(h) * 60 + int(m) <= now_mins else ""
+        else:
+            css = ""
+        rows += "<tr" + css + "><td>" + p + "</td><td>" + display + "</td></tr>"
+    if state["last_cast_ok"] is True:
+        lc = "<span class=ok>" + (state["last_cast_label"] or "") + " &#10003;</span>"
+    elif state["last_cast_ok"] is False:
+        lc = "<span class=fl>" + (state["last_cast_label"] or "") + " &#10007;</span>"
+    else:
+        lc = "none yet"
+    if state["cast_host"]:
+        cast_status = "<span class=ok>&#10003; Found</span>"
+    else:
+        cast_status = "<span class=fl>&#9888; Not found</span>"
+    return render_template(
+        "www/status.html",
+        device_name=state["device_name"] or "Bilal Cast",
+        cast_status=cast_status,
+        local_time=local_time,
+        local_ip=state["local_ip"] or "?",
+        rssi_svg=_rssi_svg(rssi),
+        rows=rows,
+        lc=lc,
+        hostname=state["hostname"] or "bilalcast",
+    )
+
+
+def render_settings(state, pre_athan_mins, calc_method):
+    return render_template(
+        "www/settings.html",
+        address=str(state.get("address") or ""),
+        lat=str(state["lat"] or ""),
+        lon=str(state["lon"] or ""),
+        pre_athan_mins=str(pre_athan_mins),
+        method=str(calc_method),
+        lat_adj=str(state.get("lat_adj", 1)),
+        midnight=str(state.get("midnight", 0)),
+        school=str(state.get("school", 0)),
+        cast_device_name=state["device_name"] or "",
+    )
+
+
+def save_settings(form, config_file):
+    with open(config_file) as f:
+        cfg = json.load(f)
+    cfg["pre_athan_mins"] = form.get("pre_athan_mins", "10").strip()
+    cfg["method"] = form.get("method", "2").strip()
+    cfg["lat_adj"] = form.get("lat_adj", "1").strip()
+    cfg["midnight"] = form.get("midnight", "0").strip()
+    cfg["school"] = form.get("school", "0").strip()
+    lat_val = form.get("lat", "").strip()
+    lon_val = form.get("lon", "").strip()
+    address_val = form.get("address", "").strip()
+    if lat_val and lon_val:
+        cfg["lat"] = lat_val
+        cfg["lon"] = lon_val
+        if address_val:
+            cfg["address"] = address_val
+        else:
+            cfg.pop("address", None)
+    elif address_val:
+        cfg["address"] = address_val
+        cfg.pop("lat", None)
+        cfg.pop("lon", None)
+    else:
+        cfg.pop("lat", None)
+        cfg.pop("lon", None)
+        cfg.pop("address", None)
+    old_name = cfg.get("cast_device_name", "")
+    new_name = form.get("cast_device_name", "").strip()
+    if new_name:
+        cfg["cast_device_name"] = new_name
+        if new_name != old_name:
+            try:
+                os.remove("cast_device.json")
+            except Exception:
+                pass
+    with open(config_file, "w") as f:
+        json.dump(cfg, f)
+    machine.Timer(-1).init(
+        period=1000,
+        mode=machine.Timer.ONE_SHOT,
+        callback=lambda t: machine.reset(),
+    )
+
+
+def start_status_server(state, pre_athan_mins, calc_method, config_file, log_file, activation_url, do_cast):
+    app = server.Phew()
+
+    @app.route("/", methods=["GET"])
+    def status_page(request):
+        return render_status(state)
+
+    @app.route("/test", methods=["POST"])
+    def test_cast_route(request):
+        asyncio.create_task(do_cast(activation_url, "test"))
+        return "ok", 200
+
+    @app.route("/icon.png", methods=["GET"])
+    def icon_route(request):
+        return app.serve_file("www/icon.png")
+
+    @app.route("/settings", methods=["GET"])
+    def settings_page(request):
+        return render_settings(state, pre_athan_mins, calc_method)
+
+    @app.route("/settings", methods=["POST"])
+    def settings_save(request):
+        return save_settings(request.form, config_file)
+
+    @app.route("/logs", methods=["GET"])
+    def logs_page(request):
+        entries = logger.get_log_buffer()
+        rows = ""
+        for ts, level, msg in reversed(entries):
+            css = "wl" if level == "WARN" else ("el" if level == "ERROR" else "il")
+            msg_safe = msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            rows += "<tr class={}>".format(css)
+            rows += "<td class=ts>{}</td><td class=lv>{}</td><td>{}</td></tr>".format(ts, level, msg_safe)
+        return render_template("www/logs.html", rows=rows + "", count=str(len(entries)))
+
+    @app.route("/logs/clear", methods=["POST"])
+    def logs_clear(request):
+        logger.clear_log()
+        try:
+            os.remove(log_file)
+        except Exception:
+            pass
+        return "ok", 200
+
+    @app.route("/factory-reset", methods=["POST"])
+    def factory_reset_route(request):
+        logger.clear_log()
+        for f in (config_file, "cast_device.json", "cast_state.json", log_file):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
+        machine.Timer(-1).init(
+            period=1000,
+            mode=machine.Timer.ONE_SHOT,
+            callback=lambda t: machine.reset(),
+        )
+        return "resetting", 200
+
+    loop = asyncio.get_event_loop()
+    app.run_as_task(loop)

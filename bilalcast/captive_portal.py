@@ -5,6 +5,7 @@ CONFIG_FILE = "config.json"
 AP_NAME = "Bilal Cast Onboarding"
 AP_DOMAIN = "bilalcast.net"
 _REBOOT_TIMER = None
+_config_saved = False
 
 
 async def captive_portal():
@@ -43,6 +44,8 @@ async def captive_portal():
 
     @app.catchall()
     def ap_catch_all(request):
+        if _config_saved and "apple.com" in request.headers.get("host", ""):
+            return "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"
         if request.headers.get("host") != AP_DOMAIN:
             return render_template("www/redirect.html", domain=AP_DOMAIN)
         return "Not found.", 404
@@ -64,7 +67,7 @@ async def captive_portal():
 
     @app.route("/configure", methods=["POST"])
     def ap_configure(request):
-        global _REBOOT_TIMER
+        global _REBOOT_TIMER, _config_saved
         with open(CONFIG_FILE, "w") as f:
             json.dump(request.form, f)
             f.flush()
@@ -72,8 +75,9 @@ async def captive_portal():
             os.sync()
         except:
             pass
+        _config_saved = True
         _REBOOT_TIMER = machine.Timer(-1)
-        _REBOOT_TIMER.init(period=1000, mode=machine.Timer.ONE_SHOT, callback=lambda t: machine.reset())
+        _REBOOT_TIMER.init(period=3000, mode=machine.Timer.ONE_SHOT, callback=lambda t: machine.reset())
         return render_template("www/configured.html", ssid=request.form.get("ssid", ""))
 
     ap = access_point(AP_NAME)

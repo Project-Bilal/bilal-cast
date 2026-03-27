@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=UTF-8>
+<meta name=viewport content='width=device-width,initial-scale=1'>
+<meta name=apple-mobile-web-app-capable content=yes>
+<meta name=apple-mobile-web-app-status-bar-style content=default>
+<meta name=apple-mobile-web-app-title content="Bilal Cast">
+<link rel=apple-touch-icon href=/icon.png>
+<title>Bilal Cast — Settings</title>
+<style>
+body{font-family:sans-serif;margin:0;padding:16px;background:#f4f6f9;color:#222}
+h1{margin:0 0 12px;font-size:1.3rem;color:#1a73e8}
+.c{background:#fff;border-radius:8px;padding:14px;margin:8px 0;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+label{display:block;margin:10px 0 3px;font-size:.9rem;font-weight:600;color:#444}
+input,select{width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:.95rem}
+.hint{font-size:.78rem;color:#888;margin:3px 0 0}
+button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 2px;font-size:.9rem}
+.bt{background:#1a73e8;color:#fff}.bg{background:#5f6368;color:#fff}.bp{background:#34a853;color:#fff}
+.aw{position:relative}
+#cl{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#aaa;font-size:1.1rem;padding:0;margin:0;line-height:1;display:none}
+#cl:hover{color:#555}
+#ad{padding-right:28px}
+#sg{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ccc;border-top:none;border-radius:0 0 4px 4px;list-style:none;margin:0;padding:0;z-index:10;display:none;box-shadow:0 2px 6px rgba(0,0,0,.15);max-height:200px;overflow-y:auto}
+#sg li{padding:9px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #eee}
+#sg li:last-child{border-bottom:none}
+#sg li:hover{background:#e8f0fe}
+#pv{margin-top:8px}
+#pv table{width:100%;border-collapse:collapse}
+#pv td{padding:4px 8px;font-size:.9rem}
+#pv tr:nth-child(odd){background:#f4f6f9}
+</style>
+</head>
+<body>
+<h1>Settings</h1>
+<form method=post action=/settings id=sf>
+<input type=hidden name=lat id=lv value="{{lat}}">
+<input type=hidden name=lon id=ov value="{{lon}}">
+<div class=c>
+<b>Location</b>
+<p class=hint>Type a city or address. Select a suggestion to lock exact coordinates, or leave as-is for address-based lookup.</p>
+<label>City or address</label>
+<div class=aw>
+<input type=text name=address id=ad autocomplete=off placeholder="e.g. London, UK" value="{{address}}">
+<button type=button id=cl title=Clear>&times;</button>
+<ul id=sg></ul>
+</div>
+<p id=ch class=hint></p>
+<button type=button class=bp id=pb style="margin-top:8px">Preview Prayer Times</button>
+<div id=pv></div>
+</div>
+<div class=c>
+<b>Pre-Prayer Notification</b>
+<label>Play reminder before each prayer</label>
+<select name=pre_athan_mins>
+<option value=0 {{"selected" if pre_athan_mins=="0" else ""}}>Off</option>
+<option value=5 {{"selected" if pre_athan_mins=="5" else ""}}>5 minutes before</option>
+<option value=10 {{"selected" if pre_athan_mins=="10" else ""}}>10 minutes before</option>
+<option value=15 {{"selected" if pre_athan_mins=="15" else ""}}>15 minutes before</option>
+<option value=20 {{"selected" if pre_athan_mins=="20" else ""}}>20 minutes before</option>
+<option value=30 {{"selected" if pre_athan_mins=="30" else ""}}>30 minutes before</option>
+</select>
+</div>
+<div class=c>
+<b>Prayer Calculation Method</b>
+<label>Aladhan calculation authority</label>
+<select name=method>
+<option value=1 {{"selected" if method=="1" else ""}}>University of Islamic Sciences, Karachi</option>
+<option value=2 {{"selected" if method=="2" else ""}}>Islamic Society of North America (ISNA)</option>
+<option value=3 {{"selected" if method=="3" else ""}}>Muslim World League</option>
+<option value=4 {{"selected" if method=="4" else ""}}>Umm Al-Qura University, Makkah</option>
+<option value=5 {{"selected" if method=="5" else ""}}>Egyptian General Authority of Survey</option>
+<option value=9 {{"selected" if method=="9" else ""}}>Kuwait</option>
+<option value=10 {{"selected" if method=="10" else ""}}>Qatar</option>
+<option value=15 {{"selected" if method=="15" else ""}}>Moonsighting Committee Worldwide</option>
+</select>
+</div>
+<div class=c>
+<b>Latitude Adjustment Method</b>
+<p class=hint>How to handle high-latitude locations where standard calculation may not apply.</p>
+<label>High-latitude adjustment</label>
+<select name=lat_adj>
+<option value=0 {{"selected" if lat_adj=="0" else ""}}>None</option>
+<option value=1 {{"selected" if lat_adj=="1" else ""}}>Middle of Night</option>
+<option value=2 {{"selected" if lat_adj=="2" else ""}}>One-Seventh of Night</option>
+<option value=3 {{"selected" if lat_adj=="3" else ""}}>Angle-Based</option>
+</select>
+</div>
+<div class=c>
+<b>Asr Calculation</b>
+<p class=hint>Determines the shadow length used to calculate Asr prayer time.</p>
+<label>Juristic school</label>
+<select name=school>
+<option value=0 {{"selected" if school=="0" else ""}}>Standard / Shafi (shadow factor 1×)</option>
+<option value=1 {{"selected" if school=="1" else ""}}>Hanafi (shadow factor 2×)</option>
+</select>
+</div>
+<div class=c>
+<b>Midnight Mode</b>
+<p class=hint>Defines when Islamic midnight falls, used by some calculation methods.</p>
+<label>Midnight calculation</label>
+<select name=midnight>
+<option value=0 {{"selected" if midnight=="0" else ""}}>Standard (midpoint of sunset to sunrise)</option>
+<option value=1 {{"selected" if midnight=="1" else ""}}>Jafari (midpoint of sunset to Fajr)</option>
+</select>
+</div>
+<div class=c>
+<b>Cast Device</b>
+<label>Device name (as shown in Google Home)</label>
+<input type=text name=cast_device_name value="{{cast_device_name}}" required>
+</div>
+<div class=c>
+<button type=submit class=bt>Save &amp; Reboot</button>
+<a href=/><button type=button class=bg>Cancel</button></a>
+<p class=hint style="margin-top:10px">Device will reboot after saving to apply changes.</p>
+</div>
+</form>
+<script>
+var ad=document.getElementById('ad'),sg=document.getElementById('sg'),
+    lv=document.getElementById('lv'),ov=document.getElementById('ov'),
+    ch=document.getElementById('ch'),pb=document.getElementById('pb'),pv=document.getElementById('pv'),
+    cl=document.getElementById('cl');
+
+function updClear(){cl.style.display=ad.value?'block':'none';}
+updClear();
+cl.addEventListener('click',function(){
+  ad.value='';lv.value='';ov.value='';
+  sg.style.display='none';pv.innerHTML='';
+  updClear();upd();ad.focus();
+});
+
+function upd(){
+  if(lv.value&&ov.value){
+    ch.textContent='\uD83D\uDCCD Coordinates: '+parseFloat(lv.value).toFixed(4)+', '+parseFloat(ov.value).toFixed(4);
+  }else{
+    ch.textContent=ad.value.trim()?'Address-based lookup (no coordinates locked)':'';
+  }
+}
+upd();
+
+var tm;
+ad.addEventListener('input',function(){
+  lv.value='';ov.value='';upd();updClear();
+  clearTimeout(tm);
+  var q=ad.value.trim();
+  if(q.length<3){sg.style.display='none';return;}
+  tm=setTimeout(function(){
+    fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=5')
+    .then(function(r){return r.json();})
+    .then(function(rs){
+      sg.innerHTML='';
+      if(!rs.length){sg.style.display='none';return;}
+      rs.forEach(function(item){
+        var li=document.createElement('li');
+        li.textContent=item.display_name;
+        li.addEventListener('click',function(){
+          ad.value=item.display_name;
+          lv.value=item.lat;ov.value=item.lon;
+          sg.style.display='none';upd();
+        });
+        sg.appendChild(li);
+      });
+      sg.style.display='block';
+    })
+    .catch(function(){sg.style.display='none';});
+  },400);
+});
+
+document.addEventListener('click',function(e){
+  if(!ad.contains(e.target)&&!sg.contains(e.target))sg.style.display='none';
+});
+
+function fmt12(hm){
+  if(!hm)return'\u2014';
+  var p=hm.split(':'),h=parseInt(p[0]),m=p[1],s=h<12?'AM':'PM';
+  h=h%12||12;return h+':'+m+' '+s;
+}
+
+pb.addEventListener('click',function(){
+  var a=ad.value.trim();
+  if(!a){pv.innerHTML='<p class=hint>Enter an address first.</p>';return;}
+  var m=document.querySelector('select[name=method]').value;
+  var la=document.querySelector('select[name=lat_adj]').value;
+  var mi=document.querySelector('select[name=midnight]').value;
+  var sc=document.querySelector('select[name=school]').value;
+  var extra='&latitudeAdjustmentMethod='+la+'&midnightMode='+mi+'&school='+sc;
+  var now=new Date(),ds=now.getDate()+'-'+(now.getMonth()+1)+'-'+now.getFullYear();
+  var url;
+  if(lv.value&&ov.value){
+    url='https://api.aladhan.com/v1/timings/'+ds+'?latitude='+lv.value+'&longitude='+ov.value+'&method='+m+extra;
+  }else{
+    url='https://api.aladhan.com/v1/timingsByAddress/'+ds+'?address='+encodeURIComponent(a)+'&method='+m+extra;
+  }
+  pv.innerHTML='<p class=hint>Loading\u2026</p>';
+  fetch(url)
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.code!==200){pv.innerHTML='<p class=hint style="color:#d93025">Could not fetch prayer times.</p>';return;}
+    var t=data.data.timings;
+    var rows=['Fajr','Dhuhr','Asr','Maghrib','Isha'].map(function(p){
+      return '<tr><td>'+p+'</td><td>'+fmt12((t[p]||'').substring(0,5))+'</td></tr>';
+    }).join('');
+    pv.innerHTML='<table>'+rows+'</table>';
+  })
+  .catch(function(){pv.innerHTML='<p class=hint style="color:#d93025">Network error.</p>';});
+});
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import asyncio
 import machine
 import network
 import utime as time
@@ -6,16 +7,21 @@ import ntptime
 import os
 
 import bilalcast.logger as logger
-from bilalcast.logger import log, send_ntfy
+from bilalcast.logger import log, warn, error, send_ntfy
 from bilalcast.prayer import (
     get_location,
-    get_next_prayer,
+    get_all_prayers,
+    get_all_prayers_by_address,
+    try_prayers_by_address,
+    geocode_address,
     pre_athan_time,
     seconds_until,
     ATHANS,
+    ATHANS_ORDER,
     PRE_ATHAN,
 )
-from bilalcast.discovery import resolve_cast_device, cast_url
+from bilalcast.discovery import resolve_cast_device, cast_url, start_mdns_responder
+from bilalcast.status import start_status_server
 
 # USER CONFIGURED DATA
 DEBUG = False  # True = print to console, False = send via ntfy
@@ -23,14 +29,47 @@ DEBUG = False  # True = print to console, False = send via ntfy
 ACTIVATION_URL = "https://translate.google.com/translate_tts?client=tw-ob&tl=en&q=Salaam+Alaykum,+This+is+Belaal+Cast.+You+will+hear+the+adthaan+on+this+device."
 
 CONFIG_FILE = "config.json"
+CAST_STATE_FILE = "cast_state.json"
+LOG_FILE = "bilalcast.log"
 
 # Runtime config — populated from CONFIG_FILE at boot
 SSID = None
 PASSWORD = None
 CAST_DEVICE_NAME = None
+DEVICE_HOSTNAME = "bilalcast"  # not configurable
+PRE_ATHAN_MINS = 10
+CALC_METHOD = 2
+LAT_ADJ_METHOD = 1
+MIDNIGHT_MODE = 0
+SCHOOL = 0
+_cfg_lat = None
+_cfg_lon = None
+_cfg_address = None
+_tz_string = ""
 
 _led = machine.Pin("LED", machine.Pin.OUT)
 _led_timer = None
+
+# Shared state between HTTP handler and prayer scheduler
+state = {
+    "prayer_times": {},
+    "next_prayer": None,
+    "next_prayer_time": None,
+    "cast_host": None,
+    "cast_port": None,
+    "last_cast_ok": None,
+    "last_cast_label": None,
+    "lat": None,
+    "lon": None,
+    "address": None,
+    "lat_adj": 1,
+    "midnight": 0,
+    "school": 0,
+    "local_ip": None,
+    "boot_epoch": 0,
+    "device_name": None,
+    "hostname": "bilalcast",
+}
 
 
 def led_blink():
@@ -89,7 +128,7 @@ _NTP_HOSTS = [
 
 
 def connect_to_wifi_with_retries(
-    ssid, password, *, max_retries=10, timeout_seconds=30, retry_delay_s=2
+    ssid, password, *, hostname=None, max_retries=10, timeout_seconds=30, retry_delay_s=2
 ):
     statuses = {
         network.STAT_IDLE: "idle",
@@ -108,6 +147,11 @@ def connect_to_wifi_with_retries(
 
             wlan.active(False)
             time.sleep(1)
+            if hostname:
+                try:
+                    network.hostname(hostname)
+                except Exception:
+                    pass
             wlan.active(True)
 
             wlan.connect(ssid, password)
@@ -171,15 +215,145 @@ def set_rtc(max_attempts=20):
     machine.reset()
 
 
+def adjust_rtc(utc_offset_secs):
+    t = time.localtime(time.time() + utc_offset_secs)
+    machine.RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
+    log("RTC adjusted to local time (UTC offset {}s)".format(utc_offset_secs))
+
+
 def ensure_wifi():
     wlan = network.WLAN(network.STA_IF)
     if not wlan.isconnected():
-        log("WiFi dropped, reconnecting...")
+        warn("WiFi dropped, reconnecting...")
         connect_to_wifi_with_retries(SSID, PASSWORD)
 
 
-def main():
-    global SSID, PASSWORD, CAST_DEVICE_NAME
+def _time_passed(hhmm):
+    """Return True if HH:MM has already passed today (local time)."""
+    now = time.localtime()
+    h, m = hhmm.split(":")
+    return int(h) * 60 + int(m) <= now[3] * 60 + now[4]
+
+
+def _get_prayer_times(lat, lon, method, tz):
+    """Fetch prayer times with address fallback chain.
+
+    1. lat/lon available → lat/lon endpoint (retry forever)
+    2. address config, no lat/lon → address endpoint (retry forever)
+    3. fallback path: never reached if caller ensures lat/lon or address is set
+    """
+    if lat is not None and lon is not None:
+        return get_all_prayers(lat, lon, method, tz, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL)
+    if _cfg_address:
+        return get_all_prayers_by_address(_cfg_address, method, tz, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL)
+    return {}
+
+
+async def _discovery_loop():
+    """Background task: retry cast device discovery every 30s until found."""
+    while True:
+        await asyncio.sleep(30)
+        if state["cast_host"] is not None:
+            return
+        log("Re-attempting cast device discovery...")
+        host, port = await resolve_cast_device(state["local_ip"], CAST_DEVICE_NAME)
+        if host:
+            state["cast_host"] = host
+            state["cast_port"] = port
+            log("Cast device found: {}:{}".format(host, port))
+            return
+
+
+def _save_cast_state(ok, label):
+    state["last_cast_ok"] = ok
+    state["last_cast_label"] = label
+    try:
+        with open(CAST_STATE_FILE, "w") as f:
+            json.dump({"ok": ok, "label": label}, f)
+    except Exception as e:
+        error("cast state save failed: " + str(e))
+    logger.flush_log(LOG_FILE)
+
+
+async def do_cast(url, label):
+    ensure_wifi()
+    if state["cast_host"] is None:
+        log("Cast host unknown, attempting re-discovery...")
+        host, port = await resolve_cast_device(state["local_ip"], CAST_DEVICE_NAME)
+        if host:
+            state["cast_host"] = host
+            state["cast_port"] = port
+        else:
+            warn("cast device not found: {}".format(CAST_DEVICE_NAME))
+            send_ntfy(
+                "cast device not found: {}".format(CAST_DEVICE_NAME),
+                priority=4,
+                tags=["warning"],
+            )
+            _save_cast_state(False, label)
+            return
+    ok, cast_error = cast_url(url, state["cast_host"], state["cast_port"])
+    _save_cast_state(ok, label)
+    if ok:
+        send_ntfy(label, priority=3, tags=["bell"])
+    else:
+        error("cast failed: {} — {}".format(label, cast_error))
+        send_ntfy(
+            "cast failed: {} — {}".format(label, cast_error),
+            priority=5,
+            tags=["warning"],
+        )
+
+
+async def run_schedule():
+    while True:
+        times = state["prayer_times"]
+        for prayer in ATHANS_ORDER:
+            t = times.get(prayer)
+            if not t or _time_passed(t):
+                continue
+
+            state["next_prayer"] = prayer
+            state["next_prayer_time"] = t
+
+            if PRE_ATHAN_MINS > 0:
+                pre_t = pre_athan_time(t, PRE_ATHAN_MINS)
+                if not _time_passed(pre_t):
+                    secs_to_pre = seconds_until(pre_t)
+                    if secs_to_pre > 0:
+                        await asyncio.sleep(secs_to_pre)
+                    asyncio.create_task(
+                        do_cast(PRE_ATHAN, "pre_{}, {}".format(prayer, pre_t))
+                    )
+
+            secs_to_prayer = seconds_until(t)
+            if secs_to_prayer > 0:
+                await asyncio.sleep(secs_to_prayer)
+
+            await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t))
+            await asyncio.sleep(200)
+
+        # All today's prayers done — wait for local midnight, re-sync, re-fetch
+        state["next_prayer"] = None
+        state["next_prayer_time"] = None
+        await asyncio.sleep(max(60, seconds_until("00:01")))
+        set_rtc()
+        global _tz_string
+        geo_lat, geo_lon, offset, tz_string = get_location()
+        _tz_string = tz_string
+        if offset:
+            adjust_rtc(offset)
+        lat = float(_cfg_lat) if _cfg_lat else (None if _cfg_address else geo_lat)
+        lon = float(_cfg_lon) if _cfg_lon else (None if _cfg_address else geo_lon)
+        state["lat"] = lat
+        state["lon"] = lon
+        state["prayer_times"] = _get_prayer_times(lat, lon, CALC_METHOD, _tz_string)
+        log("Prayer times refreshed for new day")
+        logger.flush_log(LOG_FILE)
+
+
+async def main():
+    global SSID, PASSWORD, CAST_DEVICE_NAME, PRE_ATHAN_MINS, CALC_METHOD, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL, _cfg_lat, _cfg_lon, _cfg_address, _tz_string
 
     logger.configure(True, None)  # always print before WiFi is up
     led_blink()
@@ -187,107 +361,136 @@ def main():
 
     if check_factory_reset():
         log("Factory reset confirmed, clearing config...")
-        for f in (CONFIG_FILE, "cast_device.json"):
+        for f in (CONFIG_FILE, "cast_device.json", CAST_STATE_FILE, LOG_FILE):
             try:
                 os.remove(f)
             except Exception:
                 pass
-        import asyncio
         from bilalcast.captive_portal import captive_portal as _portal
 
-        asyncio.run(_portal())
+        await _portal()
         return  # never reached — portal resets the device after save
 
     config = load_config()
     if not config:
         log("No config found, starting captive portal...")
-        import asyncio
         from bilalcast.captive_portal import captive_portal as _portal
 
-        asyncio.run(_portal())
+        await _portal()
         return  # never reached — portal resets the device after save
 
     SSID = config["ssid"]
     PASSWORD = config["password"]
     CAST_DEVICE_NAME = config["cast_device_name"]
+    PRE_ATHAN_MINS = int(config.get("pre_athan_mins", 10))
+    CALC_METHOD = int(config.get("method", 2))
+    LAT_ADJ_METHOD = int(config.get("lat_adj", 1))
+    MIDNIGHT_MODE = int(config.get("midnight", 0))
+    SCHOOL = int(config.get("school", 0))
+    _cfg_lat = config.get("lat")
+    _cfg_lon = config.get("lon")
+    _cfg_address = config.get("address")
 
-    try:
-        os.stat("cast_device.json")
-        first_connection = False
-    except OSError:
-        first_connection = True
+    local_ip = connect_to_wifi_with_retries(SSID, PASSWORD, hostname=DEVICE_HOSTNAME)
+    logger.configure(DEBUG, CAST_DEVICE_NAME)
+    logger.load_log(LOG_FILE)
 
-    local_ip = connect_to_wifi_with_retries(SSID, PASSWORD)
-    logger.configure(
-        DEBUG, CAST_DEVICE_NAME
-    )  # switch to configured mode now that WiFi is up
+    geo_lat, geo_lon, utc_offset, tz_string = get_location()
+    _tz_string = tz_string
     set_rtc()
+    if utc_offset:
+        adjust_rtc(utc_offset)
 
-    cast_host, cast_port = resolve_cast_device(local_ip, CAST_DEVICE_NAME)
-    log("cast device: {}:{}".format(cast_host, cast_port))
-    led_solid()
+    # Populate state early so HTTP server can render on first request
+    state["local_ip"] = local_ip
+    state["device_name"] = CAST_DEVICE_NAME
+    state["hostname"] = DEVICE_HOSTNAME
+    state["boot_epoch"] = time.time()
+    try:
+        with open(CAST_STATE_FILE) as f:
+            cs = json.load(f)
+        state["last_cast_ok"] = cs.get("ok")
+        state["last_cast_label"] = cs.get("label")
+    except Exception:
+        pass
 
-    if first_connection:
-        log("First connection — playing activation message")
-        cast_url(ACTIVATION_URL, cast_host, cast_port)
+    # Start HTTP server and mDNS responder before cast discovery so they're
+    # reachable during the mDNS scan (which can take up to ~33s)
+    start_status_server(state, PRE_ATHAN_MINS, CALC_METHOD, CONFIG_FILE, LOG_FILE, ACTIVATION_URL, do_cast)
+    start_mdns_responder(local_ip, local_ip)
+
+    cast_host, cast_port = await resolve_cast_device(local_ip, CAST_DEVICE_NAME)
+    if cast_host:
+        log("cast device found: {}:{}".format(cast_host, cast_port))
+    else:
+        warn("cast device not found at boot, background retry active")
+        asyncio.create_task(_discovery_loop())
+
+    state["cast_host"] = cast_host
+    state["cast_port"] = cast_port
 
     t = time.localtime()
     send_ntfy(
-        "online: {:04d}-{:02d}-{:02d} {:02d}:{:02d} UTC".format(
+        "online: {:04d}-{:02d}-{:02d} {:02d}:{:02d}".format(
             t[0], t[1], t[2], t[3], t[4]
         ),
         priority=2,
         tags=["white_check_mark"],
     )
-    lat, lon = get_location()
-    prayer, prayer_time = get_next_prayer(lat, lon)
-    pre_time = pre_athan_time(prayer_time)
 
-    secs_to_pre = seconds_until(pre_time)
-    secs_to_prayer = seconds_until(prayer_time)
-
-    if secs_to_pre < secs_to_prayer:
-        secs, target, audio_file, label = (
-            secs_to_pre,
-            pre_time,
-            PRE_ATHAN,
-            f"pre_{prayer}, {pre_time}",
-        )
+    # Resolve lat/lon: explicit config > Nominatim geocoding > IP geolocation
+    if _cfg_lat and _cfg_lon:
+        lat = float(_cfg_lat)
+        lon = float(_cfg_lon)
+        log("using configured location: {}, {}".format(lat, lon))
+    elif _cfg_address and not (_cfg_lat and _cfg_lon):
+        # Try to geocode the address for precise coordinates
+        gc_lat, gc_lon = geocode_address(_cfg_address)
+        if gc_lat is not None:
+            lat = gc_lat
+            lon = gc_lon
+            _cfg_lat = str(gc_lat)
+            _cfg_lon = str(gc_lon)
+            log("geocoded to: {}, {}".format(lat, lon))
+        else:
+            # Nominatim failed — will use address endpoint for prayer times
+            lat = None
+            lon = None
+            log("geocoding failed, will use address endpoint")
     else:
-        secs, target, audio_file, label = (
-            secs_to_prayer,
-            prayer_time,
-            ATHANS[prayer],
-            f"{prayer}, {prayer_time}",
-        )
+        lat = geo_lat
+        lon = geo_lon
 
-    time.sleep(max(0, secs - 30))
+    state["lat"] = lat
+    state["lon"] = lon
+    state["address"] = _cfg_address or ""
+    state["lat_adj"] = LAT_ADJ_METHOD
+    state["midnight"] = MIDNIGHT_MODE
+    state["school"] = SCHOOL
 
-    # Poll every second until HH:MM matches; 60s safety timeout covers overshoot
-    deadline = time.time() + 60
-    while time.time() < deadline:
-        now = time.localtime()
-        if "{:02d}:{:02d}".format(now[3], now[4]) == target:
-            break
-        time.sleep(1)
-
-    ensure_wifi()
-    ok, cast_error = cast_url(audio_file, cast_host, cast_port)
-    if ok:
-        send_ntfy(label, priority=3, tags=["bell"])
+    # Fetch prayer times: try address endpoint first if no lat/lon, then geo fallback
+    if lat is None and lon is None and _cfg_address:
+        times = try_prayers_by_address(_cfg_address, CALC_METHOD, _tz_string, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL)
+        if times is None:
+            log("address prayer times failed, falling back to IP geolocation")
+            lat = geo_lat
+            lon = geo_lon
+            state["lat"] = lat
+            state["lon"] = lon
+            state["prayer_times"] = get_all_prayers(lat, lon, CALC_METHOD, _tz_string)
+        else:
+            state["prayer_times"] = times
     else:
-        send_ntfy(
-            "cast failed: {} — {}".format(label, cast_error),
-            priority=5,
-            tags=["warning"],
-        )
+        state["prayer_times"] = _get_prayer_times(lat, lon, CALC_METHOD, _tz_string)
 
-    time.sleep(200)
-    machine.reset()
+    led_solid()
+    log("ready — visit http://bilalcast.local")
+
+    await run_schedule()
 
 
 try:
-    main()
+    asyncio.run(main())
 except KeyboardInterrupt:
     log("stopped")
 except Exception as e:

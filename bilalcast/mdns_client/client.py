@@ -32,6 +32,15 @@ class Client:
         self.callbacks: dict = {}
         self.callback_fd_count: int = 0
         self.mdns_timeout = 2.0
+        self.responder_hostname: str | None = None
+        self.responder_ip: str | None = None
+
+    def enable_responder(self, hostname: str, ip: str) -> None:
+        self.responder_hostname = hostname.lower()
+        self.responder_ip = ip
+        if self.stopped:
+            self.stopped = False
+            uasyncio.get_event_loop().create_task(self.start())
 
     def add_callback(
         self,
@@ -118,8 +127,35 @@ class Client:
             finally:
                 gc.collect()
 
+    async def _handle_responder_query(self, packet: DNSResponse) -> None:
+        from bilalcast.mdns_client.constants import (
+            CLASS_IN, DEFAULT_TTL, FLAGS_QR_AUTHORITATIVE, FLAGS_QR_RESPONSE, TYPE_A,
+        )
+        from bilalcast.mdns_client.structs import DNSRecord, DNSResponse as Resp
+        from bilalcast.mdns_client.util import dotted_ip_to_bytes
+        for question in packet.questions:
+            if question.type == TYPE_A and question.query.lower() == self.responder_hostname:
+                answer = DNSRecord(
+                    name=self.responder_hostname,
+                    record_type=TYPE_A,
+                    query_class=CLASS_IN,
+                    time_to_live=DEFAULT_TTL,
+                    rdata=dotted_ip_to_bytes(self.responder_ip),
+                )
+                response = Resp(
+                    transaction_id=packet.transaction_id,
+                    message_type=FLAGS_QR_RESPONSE | FLAGS_QR_AUTHORITATIVE,
+                    questions=[],
+                    answers=[answer],
+                    authorities=[],
+                    additional=[],
+                )
+                await self.send_response(response)
+
     async def process_packet(self, buffer: bytes) -> None:
         parsed_packet = parse_packet(buffer)
+        if self.responder_ip and parsed_packet.is_request:
+            await self._handle_responder_query(parsed_packet)
         if len(self.callbacks) == 0:
             if self.print_packets:
                 print(parsed_packet)
@@ -147,8 +183,9 @@ class Client:
             deleted = True
 
         if len(self.callbacks) == 0 and not self.print_packets:
-            self.dprint("Stopping consumption pipeline as no listeners exist")
-            self.stop()
+            if self.responder_ip is None:
+                self.dprint("Stopping consumption pipeline as no listeners exist")
+                self.stop()
 
         return deleted
 

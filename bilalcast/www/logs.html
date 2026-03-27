@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=UTF-8>
+<meta name=viewport content='width=device-width,initial-scale=1'>
+<meta name=apple-mobile-web-app-capable content=yes>
+<meta name=apple-mobile-web-app-status-bar-style content=default>
+<meta name=apple-mobile-web-app-title content="Bilal Cast">
+<link rel=apple-touch-icon href=/icon.png>
+<title>Bilal Cast — Logs</title>
+<style>
+body{font-family:sans-serif;margin:0;padding:16px;background:#f4f6f9;color:#222}
+.hd{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
+h1{margin:0;font-size:1.3rem;color:#1a73e8}
+.c{background:#fff;border-radius:8px;padding:14px;margin:8px 0;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 2px;font-size:.9rem}
+.bg{background:#5f6368;color:#fff}.br{background:#d93025;color:#fff}
+.hint{font-size:.78rem;color:#888;margin:4px 0 0}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+td{padding:4px 6px;vertical-align:top;border-bottom:1px solid #eee}
+.ts{white-space:nowrap;color:#888;width:1%;padding-right:10px}
+.lv{white-space:nowrap;width:1%;font-weight:600;padding-right:10px}
+.il .lv{color:#1a73e8}
+.wl{background:#fff8e1}
+.wl .lv{color:#f57c00}
+.el{background:#fce8e6}
+.el .lv{color:#d93025}
+</style>
+</head>
+<body>
+<div class=hd>
+<h1>Logs</h1>
+<a href=/><button type=button class=bg>&#8592; Back</button></a>
+</div>
+<div class=c>
+<button class=br onclick="if(confirm('Clear all logs?'))fetch('/logs/clear',{method:'POST'}).then(()=>location.reload())">Clear Log</button>
+<p class=hint>{{count}} entries &middot; newest first &middot; persists across reboots</p>
+</div>
+<div class=c style="padding:0;overflow-x:auto">
+<table>{{rows + ""}}</table>
+</div>
+</body>
+</html>

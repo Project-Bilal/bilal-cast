@@ -24,7 +24,13 @@
       "Bash(docker build *)",
       "Bash(docker run *)",
       "Bash(grep:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "WebSearch",
+      "WebFetch(domain:www.nongnu.org)",
+      "WebFetch(domain:forums.raspberrypi.com)",
+      "Bash(find /Users/omars/stash/bilal-cast -type f -name \"*.py\" -exec grep -l \"responder\\\\|response\" {})",
+      "WebFetch(domain:nominatim.org)",
+      "WebFetch(domain:nominatim.openstreetmap.org)"
     ]
   }
 }
