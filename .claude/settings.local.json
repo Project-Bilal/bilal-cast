@@ -31,7 +31,9 @@
       "Bash(find /Users/omars/stash/bilal-cast -type f -name \"*.py\" -exec grep -l \"responder\\\\|response\" {})",
       "WebFetch(domain:nominatim.org)",
       "WebFetch(domain:nominatim.openstreetmap.org)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(ls -lh *.uf2)",
+      "Bash(ls -lh bilalcast*.uf2)"
     ]
   }
 }

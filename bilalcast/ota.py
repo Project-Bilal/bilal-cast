@@ -17,7 +17,7 @@ _OTA_DIRS = [
 ]
 
 # Infrastructure files frozen into the UF2 — skip even if present in directory listing
-_FROZEN = {"bilalcast/captive_portal.py", "bilalcast/logger.py", "bilalcast/ota.py"}
+_FROZEN = {"bilalcast/captive_portal.py", "bilalcast/logger.py", "bilalcast/ota.py", "bilalcast/www/icon.png"}
 
 
 def _local_version():

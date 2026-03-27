@@ -51,10 +51,14 @@ ADD bilalcast/logger.py         modules/bilalcast/logger.py
 ADD bilalcast/ota.py            modules/bilalcast/ota.py
 ADD bilalcast/mdns_client       modules/bilalcast/mdns_client
 
+# --- Bake icon.png into firmware as a frozen bytes module ---
+ADD bilalcast/www/icon.png /tmp/icon.png
+RUN python3 -c "d=open('/tmp/icon.png','rb').read(); open('modules/bilalcast/icon_data.py','w').write('DATA='+repr(d)+'\n')"
+
 # --- Frozen bootstrap entry point ---
 ADD _bootstrap.py modules/main.py
 
 ENV MICROPYTHON_FILE_PATH=${MICROPYTHON_FILE_PATH}
 
 ENTRYPOINT [ "bash" ]
-CMD ["-c", "make clean && make submodules && make -j16 && cp build-${BOARD}/firmware.uf2 /tmp/bilalcast-build/firmware.mp.${MICROPYTHON_FILE_PATH}.rp2.uf2"]
+CMD ["-c", "make clean && make submodules && make -j16 && cp build-${BOARD}/firmware.uf2 /tmp/bilalcast-build/firmware.mp.${MICROPYTHON_FILE_PATH}.rp2.uf2 && date -u +%Y-%m-%d-%H%M > /tmp/bilalcast-build/version.txt && echo \"Version: $(cat /tmp/bilalcast-build/version.txt)\""]

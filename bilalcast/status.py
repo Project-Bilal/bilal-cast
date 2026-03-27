@@ -30,7 +30,7 @@ def _rssi_svg(dbm_str):
         ' stroke="' + c[1] + '" stroke-width="2" fill="none" stroke-linecap="round"/>'
         '<path d="M0.5,5 Q9,-2 17.5,5"'
         ' stroke="' + c[2] + '" stroke-width="2" fill="none" stroke-linecap="round"/>'
-        '</svg>'
+        "</svg>"
     )
 
 
@@ -149,7 +149,9 @@ def save_settings(form, config_file):
     )
 
 
-def start_status_server(state, pre_athan_mins, calc_method, config_file, activation_url, do_cast, local_ip):
+def start_status_server(
+    state, pre_athan_mins, calc_method, config_file, activation_url, do_cast, local_ip
+):
     app = server.Phew()
 
     @app.route("/", methods=["GET"])
@@ -163,7 +165,11 @@ def start_status_server(state, pre_athan_mins, calc_method, config_file, activat
 
     @app.route("/icon.png", methods=["GET"])
     def icon_route(request):
-        return app.serve_file("www/icon.png")
+        from bilalcast.icon_data import (  # pyright: ignore[reportMissingImports]
+            DATA,
+        )
+
+        return DATA, 200, "image/png"
 
     @app.route("/settings", methods=["GET"])
     def settings_page(request):
@@ -180,9 +186,11 @@ def start_status_server(state, pre_athan_mins, calc_method, config_file, activat
     @app.route("/scan-cast-devices", methods=["POST"])
     def scan_cast_devices_route(request):
         from bilalcast.discovery import list_cast_devices
+
         async def _scan():
             names = await list_cast_devices(local_ip)
             state["cast_devices"] = names
+
         asyncio.create_task(_scan())
         return "ok", 200
 
