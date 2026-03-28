@@ -1,6 +1,3 @@
-from bilalcast.logger import log
-
-
 CONFIG_FILE = "config.json"
 AP_NAME = "Bilal Cast Onboarding"
 AP_DOMAIN = "bilalcast.net"
@@ -92,7 +89,6 @@ async def captive_portal():
         wlan.active(True)
         time.sleep(2)
         results = wlan.scan()
-        log("scan found {} networks".format(len(results)))
         results.sort(key=lambda x: -x[3])  # sort by RSSI descending
         seen = set()
         for r in results:
@@ -105,8 +101,8 @@ async def captive_portal():
             seen.add(ssid)
             safe = ssid.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
             network_options += '<option value="{}">{}</option>'.format(safe, safe)
-    except Exception as e:
-        log("Wi-Fi scan failed (non-fatal): {}".format(e))
+    except Exception:
+        pass
 
     show_picker = "block" if network_options else "none"
     show_manual = "none" if network_options else "block"
@@ -177,8 +173,8 @@ async def captive_portal():
         time.sleep_ms(100)
     try:
         dns.run_catchall(ap.ifconfig()[0])
-    except Exception as e:
-        log("DNS server failed (non-fatal): {}".format(e))
+    except Exception:
+        pass
     loop = asyncio.get_event_loop()
     app.run_as_task(loop)
     while True:

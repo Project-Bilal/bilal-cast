@@ -47,9 +47,7 @@ WORKDIR /opt/app/micropython/ports/rp2
 # --- Freeze only infrastructure modules (not app modules) ---
 ADD bilalcast/phew              modules/bilalcast/phew
 ADD bilalcast/captive_portal.py modules/bilalcast/captive_portal.py
-ADD bilalcast/logger.py         modules/bilalcast/logger.py
 ADD bilalcast/ota.py            modules/bilalcast/ota.py
-ADD bilalcast/mdns_client       modules/bilalcast/mdns_client
 
 # --- Bake icon.png into firmware as a frozen bytes module ---
 ADD bilalcast/www/icon.png /tmp/icon.png

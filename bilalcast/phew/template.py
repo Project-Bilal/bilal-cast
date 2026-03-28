@@ -1,11 +1,4 @@
-from . import logging
-
-
 async def render_template(template, **kwargs):
-    import time  # pyright: ignore[reportMissingImports]
-
-    start_time = time.ticks_ms()
-
     with open(template, "rb") as f:
         # read the whole template file, we could work on single lines but
         # the performance is much worse - so long as our templates are
@@ -64,4 +57,3 @@ async def render_template(template, **kwargs):
             # discard the parsed bit
             token_caret = end + 2
 
-    logging.debug("> parsed template:", template, "(took", time.ticks_ms() - start_time, "ms)")

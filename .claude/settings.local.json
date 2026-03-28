@@ -34,7 +34,12 @@
       "WebFetch(domain:api.github.com)",
       "Bash(ls -lh *.uf2)",
       "Bash(ls -lh bilalcast*.uf2)",
-      "Bash(git submodule:*)"
+      "Bash(git submodule:*)",
+      "Bash(find /Users/omars/stash/bilal-cast/bilalcast/mdns_client -type f -exec wc -l {} +)",
+      "Bash(ls -la /Users/omars/stash/bilal-cast/bilalcast/*.py)",
+      "Bash(find /Users/omars/stash/bilal-cast/bilalcast -type f -name \"*.py\" -exec ls -lh {})",
+      "Bash(find /Users/omars/stash/bilal-cast/bilalcast -maxdepth 1 -name \"*.py\" -type f -exec wc -l {})",
+      "Bash(sort -k1 -nr)"
     ]
   }
 }

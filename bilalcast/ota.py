@@ -56,41 +56,53 @@ def _makedirs(path):
 
 def _download(url, local_path):
     _makedirs(local_path)
-    try:
-        r = urequests.get(url)
+    for attempt in range(3):
         try:
-            with open(local_path, "wb") as f:
-                f.write(r.content)
-        finally:
-            r.close()
-        print("OTA:", local_path)
-        return True
-    except Exception as e:
-        print("OTA failed:", local_path, e)
-        return False
+            r = urequests.get(url)
+            try:
+                with open(local_path, "wb") as f:
+                    f.write(r.content)
+            finally:
+                r.close()
+            print("OTA:", local_path)
+            return True
+        except Exception as e:
+            print("OTA retry", attempt + 1, local_path, e)
+            if attempt < 2:
+                import utime
+                utime.sleep(2)
+    return False
 
 
 def _list_dir(github_path):
-    try:
-        r = urequests.get(
-            _API + "/" + github_path,
-            headers={"User-Agent": "bilalcast-ota"},
-        )
+    for attempt in range(3):
         try:
-            items = json.loads(r.text)
-        finally:
-            r.close()
-        return [(i["path"], i["download_url"]) for i in items if i["type"] == "file"]
-    except Exception as e:
-        print("OTA list failed:", github_path, e)
-        return []
+            r = urequests.get(
+                _API + "/" + github_path,
+                headers={"User-Agent": "bilalcast-ota"},
+            )
+            try:
+                items = json.loads(r.text)
+            finally:
+                r.close()
+            return [(i["path"], i["download_url"]) for i in items if i["type"] == "file"]
+        except Exception as e:
+            print("OTA list retry", attempt + 1, github_path, e)
+            if attempt < 2:
+                import utime
+                utime.sleep(2)
+    return None
 
 
 def download_all():
     """Download all OTA app files. Returns True if all succeeded."""
     failed = 0
     for github_dir, local_dir in _OTA_DIRS:
-        for github_path, url in _list_dir(github_dir):
+        files = _list_dir(github_dir)
+        if files is None:
+            failed += 1
+            continue
+        for github_path, url in files:
             if github_path in _FROZEN:
                 continue
             filename = github_path[len(github_dir) + 1:]

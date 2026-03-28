@@ -75,12 +75,6 @@ class PacketParser:
         rname = self._expand_name(record_entry[mname_end_index:rname_end_index])
         return mname + rname + record_entry[rname_end_index:]
 
-    def _parse_mx_entry(self, record_entry: bytes) -> bytes:
-        # First 16 byte are preference flag, afterwards the domain name
-        # is specified
-        expanded_name = self._expand_name(record_entry[16:])
-        return record_entry[16:] + expanded_name
-
     def _expand_name(self, string_bytes: bytes) -> bytes:
         payload = b""
         index = 0

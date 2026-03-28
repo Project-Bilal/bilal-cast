@@ -1,7 +1,6 @@
 import gc
 
-import uasyncio, os, time  # pyright: ignore[reportMissingImports]
-from . import logging
+import uasyncio, os  # pyright: ignore[reportMissingImports]
 
 
 def urldecode(text):
@@ -242,13 +241,10 @@ class Phew:
 
         response = None
 
-        request_start_time = time.ticks_ms()
-
         request_line = await reader.readline()
         try:
             method, uri, protocol = request_line.decode().split()
-        except Exception as e:
-            logging.error(e)
+        except Exception:
             return
 
         request = Request(method, uri, protocol)
@@ -321,9 +317,6 @@ class Phew:
 
         writer.close()
         await writer.wait_closed()
-
-        processing_time = time.ticks_ms() - request_start_time
-        logging.info(f"> {request.method} {request.path} ({response.status} {status_message}) [{processing_time}ms]")
 
     # adds a new route to the routing table
     def add_route(self, path, handler, methods=["GET"]):

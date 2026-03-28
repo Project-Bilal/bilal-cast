@@ -2,7 +2,7 @@ import struct
 
 import uasyncio
 
-from bilalcast.mdns_client.constants import REPEAT_TYPE_FLAG, TYPE_CNAME, TYPE_MX, TYPE_NS, TYPE_PTR, TYPE_SOA, TYPE_SRV
+from bilalcast.mdns_client.constants import REPEAT_TYPE_FLAG
 
 
 def dotted_ip_to_bytes(ip: str) -> bytes:
@@ -14,14 +14,6 @@ def dotted_ip_to_bytes(ip: str) -> bytes:
     if len(ip_ints) != 4 or any(i < 0 or i > 255 for i in ip_ints):
         raise ValueError
     return bytes(ip_ints)
-
-
-def bytes_to_dotted_ip(a) -> str:
-    """
-    Convert four bytes into a dotted IPv4 address string, without any
-    sanity checks
-    """
-    return ".".join(str(i) for i in a)
 
 
 def check_name(n):
@@ -69,10 +61,6 @@ def string_to_bytes(item: str) -> bytes:
     buffer[0] = len(item)
     buffer[1:] = item.encode("utf-8")
     return buffer
-
-
-def might_have_repeatable_payload(record_type: int) -> bool:
-    return record_type in (TYPE_NS, TYPE_CNAME, TYPE_PTR, TYPE_SOA, TYPE_MX, TYPE_SRV)
 
 
 def byte_count_of_lists(*list_of_lists) -> int:
@@ -140,13 +128,3 @@ async def set_after_timeout(event: uasyncio.Event, timeout: float):
     event.set()
 
 
-def txt_data_to_bytes(txt_data) -> bytes:
-    payload = b""
-    for key, values in txt_data.items():
-        if isinstance(values, str):
-            values = [values]
-        for value in values:
-            if value is None:
-                value = ""
-            payload += string_to_bytes("{}={}".format(key, value))
-    return payload

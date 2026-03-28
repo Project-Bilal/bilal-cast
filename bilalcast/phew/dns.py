@@ -1,5 +1,4 @@
 import uasyncio, usocket  # pyright: ignore[reportMissingImports]
-from . import logging
 
 
 async def _handler(socket, ip_address):
@@ -18,12 +17,11 @@ async def _handler(socket, ip_address):
             response += b"\x00\x04"  # response length (4 bytes = 1 ipv4 address)
             response += bytes(map(int, ip_address.split(".")))  # ip address parts
             socket.sendto(response, client)
-        except Exception as e:
-            logging.error(e)
+        except Exception:
+            pass
 
 
 def run_catchall(ip_address, port=53):
-    logging.info("> starting catch all dns server on port {}".format(port))
 
     _socket = usocket.socket(usocket.AF_INET, usocket.SOCK_DGRAM)
     _socket.setblocking(False)

@@ -8,9 +8,6 @@ import gc  # pyright: ignore[reportMissingImports]
 gc.threshold(50000)
 
 # phew! the Pico (or Python) HTTP Endpoint Wrangler
-from . import logging
-
-
 # helper method to put the pico into access point mode
 def access_point(ssid, password=None):
     import network  # pyright: ignore[reportMissingImports]
