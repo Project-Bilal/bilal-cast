@@ -10,14 +10,17 @@ _RAW = "https://raw.githubusercontent.com/{}/{}/{}".format(OTA_OWNER, OTA_REPO, 
 _API = "https://api.github.com/repos/{}/{}/contents".format(OTA_OWNER, OTA_REPO)
 _VER_FILE = "ota_version.txt"
 
-# (github_dir, local_dir) — non-recursive; subdirectories are skipped automatically
+# (github_dir, local_dir) — non-recursive; subdirectories must be listed explicitly
 _OTA_DIRS = [
-    ("bilalcast", "bilalcast"),  # .py app files
-    ("bilalcast/www", "www"),    # HTML + icon → /www/ on filesystem
+    ("bilalcast", "bilalcast"),
+    ("bilalcast/phew", "bilalcast/phew"),
+    ("bilalcast/mdns_client", "bilalcast/mdns_client"),
+    ("bilalcast/mdns_client/service_discovery", "bilalcast/mdns_client/service_discovery"),
+    ("bilalcast/www", "www"),
 ]
 
 # Infrastructure files frozen into the UF2 — skip even if present in directory listing
-_FROZEN = {"bilalcast/captive_portal.py", "bilalcast/logger.py", "bilalcast/ota.py", "bilalcast/www/icon.png"}
+_FROZEN = {"bilalcast/captive_portal.py", "bilalcast/ota.py", "bilalcast/www/icon.png"}
 
 
 def _local_version():

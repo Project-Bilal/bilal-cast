@@ -33,7 +33,8 @@
       "WebFetch(domain:nominatim.openstreetmap.org)",
       "WebFetch(domain:api.github.com)",
       "Bash(ls -lh *.uf2)",
-      "Bash(ls -lh bilalcast*.uf2)"
+      "Bash(ls -lh bilalcast*.uf2)",
+      "Bash(git submodule:*)"
     ]
   }
 }

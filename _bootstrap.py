@@ -1,5 +1,43 @@
 import ujson as json  # pyright: ignore[reportMissingImports]
 import os
+import machine  # pyright: ignore[reportMissingImports]
+
+_led = machine.Pin("LED", machine.Pin.OUT)
+_led_timer = machine.Timer()
+
+
+def _led_slow_blink():
+    """Slow blink (500 ms) — waiting / connecting."""
+    _led_timer.init(period=500, mode=machine.Timer.PERIODIC, callback=lambda t: _led.toggle())
+
+
+def _led_fast_blink():
+    """Fast blink (150 ms) — active download in progress."""
+    _led_timer.init(period=150, mode=machine.Timer.PERIODIC, callback=lambda t: _led.toggle())
+
+
+def _led_solid():
+    """Solid on — success."""
+    _led_timer.deinit()
+    _led.value(1)
+
+
+def _led_error():
+    """Rapid flash (80 ms) — failure."""
+    _led_timer.init(period=80, mode=machine.Timer.PERIODIC, callback=lambda t: _led.toggle())
+
+
+def _ntfy(msg, title="Bilal Cast"):
+    try:
+        import urequests  # pyright: ignore[reportMissingImports]
+        r = urequests.post(
+            "https://ntfy.sh/",
+            data=json.dumps({"topic": "bilalpico", "title": title, "message": msg}),
+            headers={"Content-Type": "application/json"},
+        )
+        r.close()
+    except Exception:
+        pass
 
 
 def _cfg():
@@ -33,8 +71,8 @@ elif _has_app():
         import bilalcast.main
     except Exception as e:
         import sys
-        import machine  # pyright: ignore[reportMissingImports]
         import utime as time  # pyright: ignore[reportMissingImports]
+        _led_error()
         sys.print_exception(e)
         time.sleep(5)
         machine.reset()
@@ -43,12 +81,12 @@ else:
     # Config exists but app not yet downloaded — first boot after captive portal
     import network  # pyright: ignore[reportMissingImports]
     import utime as time  # pyright: ignore[reportMissingImports]
-    import machine  # pyright: ignore[reportMissingImports]
-    from bilalcast import logger
-    logger.configure(True, None)
-    from bilalcast.logger import log
 
-    log("First boot: connecting for OTA download...")
+    _title = _c.get("cast_device_name", "Bilal Cast")
+
+    print("OTA boot: connecting to WiFi...")
+    _led_slow_blink()  # slow blink = WiFi connecting
+
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     try:
@@ -62,12 +100,28 @@ else:
         time.sleep(1)
 
     if not wlan.isconnected():
-        log("WiFi failed, resetting...")
+        print("OTA boot: WiFi failed, resetting...")
+        _led_error()
+        _ntfy("OTA boot: WiFi failed — will retry on next boot", _title)
         time.sleep(2)
         machine.reset()
 
+    local_ip = wlan.ifconfig()[0]
+    print("OTA boot: WiFi connected (" + local_ip + "), starting download...")
+    _ntfy("OTA boot: WiFi connected (" + local_ip + "), downloading app...", _title)
+    _led_fast_blink()  # fast blink = downloading
+
     from bilalcast.ota import download_all
     ok = download_all()
-    log("OTA complete, rebooting..." if ok else "OTA failed, will retry on next boot...")
+
+    if ok:
+        print("OTA complete, rebooting...")
+        _ntfy("OTA complete — rebooting", _title)
+        _led_solid()
+    else:
+        print("OTA failed, will retry on next boot...")
+        _ntfy("OTA failed — some files could not be downloaded, will retry on next boot", _title)
+        _led_error()
+
     time.sleep(2)
     machine.reset()
