@@ -45,7 +45,7 @@ Last Call Made: {{lc + ""}}</div>
 <div class=c>
 <a href=/settings><button type=button class=bg>Settings</button></a>
 <button class=br onclick="if(confirm('Reset all settings?'))fetch('/factory-reset',{method:'POST'}).then(()=>alert('Resetting...'))">Factory Reset</button>
-<p style='margin:8px 0 0;font-size:.8rem;color:#888'>http://{{hostname}}.local &middot; {{local_ip}}</p>
+<p style='margin:8px 0 0;font-size:.8rem;color:#888'>http://{{hostname}}.local &middot; {{local_ip}} &middot; v{{ota_version}}</p>
 </div>
 <script>
 if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone){document.getElementById('ab').style.display='block'}

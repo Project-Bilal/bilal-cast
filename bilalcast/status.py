@@ -77,6 +77,11 @@ def render_status(state):
         cast_status = "<span class=ok>Found &#10003;</span>"
     else:
         cast_status = "<span class=fl>Not found &#9888;</span>"
+    try:
+        with open("ota_version.txt") as _f:
+            ota_version = _f.read().strip()
+    except Exception:
+        ota_version = "unknown"
     return render_template(
         "www/status.html",
         device_name=state["device_name"] or "Bilal Cast",
@@ -87,6 +92,7 @@ def render_status(state):
         rows=rows,
         lc=lc,
         hostname=state["hostname"] or "bilalcast",
+        ota_version=ota_version,
     )
 
 

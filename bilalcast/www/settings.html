@@ -196,7 +196,7 @@ function scanDevices(){
     setTimeout(function(){
       fetch('/cast-devices').then(function(r){return r.json();}).then(function(names){
         fillDeviceList(names);
-        st.textContent=names.length?'Found '+names.length+' device'+(names.length===1?'':'s')+'.':'No devices found.';
+        st.textContent=names.length?'Found '+names.length+' device'+(names.length===1?'':'s')+': '+names.join(', ')+'.':'No devices found.';
         btn.disabled=false;
       }).catch(function(){btn.disabled=false;st.textContent='';});
     },4500);
