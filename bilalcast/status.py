@@ -187,15 +187,20 @@ def start_status_server(
 
     @app.route("/cast-devices", methods=["GET"])
     def cast_devices_route(request):
-        return json.dumps(state.get("cast_devices") or []), 200, "application/json"
+        return json.dumps({
+            "devices": state.get("cast_devices") or [],
+            "scanning": state.get("scan_in_progress", False),
+        }), 200, "application/json"
 
     @app.route("/scan-cast-devices", methods=["POST"])
     def scan_cast_devices_route(request):
         from bilalcast.discovery import list_cast_devices
 
         async def _scan():
+            state["scan_in_progress"] = True
             names = await list_cast_devices(local_ip)
             state["cast_devices"] = names
+            state["scan_in_progress"] = False
 
         asyncio.create_task(_scan())
         return "ok", 200

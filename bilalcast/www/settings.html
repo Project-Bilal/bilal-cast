@@ -29,6 +29,8 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 #pv table{width:100%;border-collapse:collapse}
 #pv td{padding:4px 8px;font-size:.9rem}
 #pv tr:nth-child(odd){background:#f4f6f9}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid #ccc;border-top-color:#1a73e8;border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle;margin-right:4px}
+@keyframes sp{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -187,19 +189,23 @@ function fillDeviceList(names){
   dl.innerHTML='';
   names.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});
 }
-fetch('/cast-devices').then(function(r){return r.json();}).then(fillDeviceList).catch(function(){});
+fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){fillDeviceList(data.devices||data||[]);}).catch(function(){});
 
 function scanDevices(){
   var btn=document.getElementById('scb'),st=document.getElementById('scs');
-  btn.disabled=true;st.textContent='Scanning\u2026';
+  btn.disabled=true;st.innerHTML='<span class=spin></span> Scanning\u2026';
   fetch('/scan-cast-devices',{method:'POST'}).then(function(){
-    setTimeout(function(){
-      fetch('/cast-devices').then(function(r){return r.json();}).then(function(names){
-        fillDeviceList(names);
-        st.textContent=names.length?'Found '+names.length+' device'+(names.length===1?'':'s')+': '+names.join(', ')+'.':'No devices found.';
-        btn.disabled=false;
-      }).catch(function(){btn.disabled=false;st.textContent='';});
-    },4500);
+    var iv=setInterval(function(){
+      fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){
+        fillDeviceList(data.devices||[]);
+        if(!data.scanning){
+          clearInterval(iv);
+          var names=data.devices||[];
+          st.textContent=names.length?'Found '+names.length+' device'+(names.length===1?'':'s')+': '+names.join(', ')+'.':'No devices found.';
+          btn.disabled=false;
+        }
+      }).catch(function(){clearInterval(iv);btn.disabled=false;st.textContent='';});
+    },1500);
   }).catch(function(){btn.disabled=false;st.textContent='';});
 }
 
