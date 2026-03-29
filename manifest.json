@@ -1,0 +1,98 @@
+[
+  {
+    "remote": "bilalcast/__init__.py",
+    "local": "bilalcast/__init__.py"
+  },
+  {
+    "remote": "bilalcast/cast.py",
+    "local": "bilalcast/cast.py"
+  },
+  {
+    "remote": "bilalcast/discovery.py",
+    "local": "bilalcast/discovery.py"
+  },
+  {
+    "remote": "bilalcast/logger.py",
+    "local": "bilalcast/logger.py"
+  },
+  {
+    "remote": "bilalcast/main.py",
+    "local": "bilalcast/main.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/__init__.py",
+    "local": "bilalcast/mdns_client/__init__.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/client.py",
+    "local": "bilalcast/mdns_client/client.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/constants.py",
+    "local": "bilalcast/mdns_client/constants.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/parser.py",
+    "local": "bilalcast/mdns_client/parser.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/service_discovery/__init__.py",
+    "local": "bilalcast/mdns_client/service_discovery/__init__.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/service_discovery/discovery.py",
+    "local": "bilalcast/mdns_client/service_discovery/discovery.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/service_discovery/service_response.py",
+    "local": "bilalcast/mdns_client/service_discovery/service_response.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/service_discovery/txt_discovery.py",
+    "local": "bilalcast/mdns_client/service_discovery/txt_discovery.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/structs.py",
+    "local": "bilalcast/mdns_client/structs.py"
+  },
+  {
+    "remote": "bilalcast/mdns_client/util.py",
+    "local": "bilalcast/mdns_client/util.py"
+  },
+  {
+    "remote": "bilalcast/ota.py",
+    "local": "bilalcast/ota.py"
+  },
+  {
+    "remote": "bilalcast/phew/__init__.py",
+    "local": "bilalcast/phew/__init__.py"
+  },
+  {
+    "remote": "bilalcast/phew/dns.py",
+    "local": "bilalcast/phew/dns.py"
+  },
+  {
+    "remote": "bilalcast/phew/server.py",
+    "local": "bilalcast/phew/server.py"
+  },
+  {
+    "remote": "bilalcast/phew/template.py",
+    "local": "bilalcast/phew/template.py"
+  },
+  {
+    "remote": "bilalcast/prayer.py",
+    "local": "bilalcast/prayer.py"
+  },
+  {
+    "remote": "bilalcast/status.py",
+    "local": "bilalcast/status.py"
+  },
+  {
+    "remote": "bilalcast/www/settings.html",
+    "local": "www/settings.html"
+  },
+  {
+    "remote": "bilalcast/www/status.html",
+    "local": "www/status.html"
+  }
+]

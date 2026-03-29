@@ -40,7 +40,8 @@
       "Bash(find /Users/omars/stash/bilal-cast/bilalcast -type f -name \"*.py\" -exec ls -lh {})",
       "Bash(find /Users/omars/stash/bilal-cast/bilalcast -maxdepth 1 -name \"*.py\" -type f -exec wc -l {})",
       "Bash(sort -k1 -nr)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(sort echo:*)"
     ]
   }
 }

@@ -7,20 +7,7 @@ OTA_REPO   = "bilal-cast"
 OTA_BRANCH = "main"
 
 _RAW = "https://raw.githubusercontent.com/{}/{}/{}".format(OTA_OWNER, OTA_REPO, OTA_BRANCH)
-_API = "https://api.github.com/repos/{}/{}/contents".format(OTA_OWNER, OTA_REPO)
 _VER_FILE = "ota_version.txt"
-
-# (github_dir, local_dir) — non-recursive; subdirectories must be listed explicitly
-_OTA_DIRS = [
-    ("bilalcast", "bilalcast"),
-    ("bilalcast/phew", "bilalcast/phew"),
-    ("bilalcast/mdns_client", "bilalcast/mdns_client"),
-    ("bilalcast/mdns_client/service_discovery", "bilalcast/mdns_client/service_discovery"),
-    ("bilalcast/www", "www"),
-]
-
-# Infrastructure files frozen into the UF2 — skip even if present in directory listing
-_FROZEN = {"bilalcast/captive_portal.py", "bilalcast/www/icon.png"}
 
 
 def _local_version():
@@ -74,20 +61,16 @@ def _download(url, local_path):
     return False
 
 
-def _list_dir(github_path):
+def _fetch_manifest():
     for attempt in range(3):
         try:
-            r = urequests.get(
-                _API + "/" + github_path,
-                headers={"User-Agent": "bilalcast-ota"},
-            )
+            r = urequests.get(_RAW + "/manifest.json")
             try:
-                items = json.loads(r.text)
+                return json.loads(r.text)
             finally:
                 r.close()
-            return [(i["path"], i["download_url"]) for i in items if i["type"] == "file"]
         except Exception as e:
-            print("OTA list retry", attempt + 1, github_path, e)
+            print("OTA manifest retry", attempt + 1, e)
             if attempt < 2:
                 import utime
                 utime.sleep(2)
@@ -95,19 +78,16 @@ def _list_dir(github_path):
 
 
 def download_all():
-    """Download all OTA app files. Returns True if all succeeded."""
+    """Download all OTA app files listed in manifest.json. Returns True if all succeeded."""
+    manifest = _fetch_manifest()
+    if manifest is None:
+        print("OTA: could not fetch manifest")
+        return False
     failed = 0
-    for github_dir, local_dir in _OTA_DIRS:
-        files = _list_dir(github_dir)
-        if files is None:
+    for entry in manifest:
+        url = _RAW + "/" + entry["remote"]
+        if not _download(url, entry["local"]):
             failed += 1
-            continue
-        for github_path, url in files:
-            if github_path in _FROZEN:
-                continue
-            filename = github_path[len(github_dir) + 1:]
-            if not _download(url, local_dir + "/" + filename):
-                failed += 1
     return failed == 0
 
 
