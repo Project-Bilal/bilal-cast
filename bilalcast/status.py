@@ -8,6 +8,7 @@ import network  # pyright: ignore[reportMissingImports]
 from bilalcast.phew import server
 from bilalcast.phew.template import render_template
 from bilalcast.prayer import ATHANS_ORDER
+from bilalcast.logger import log, error
 
 
 def _rssi_svg(dbm_str):
