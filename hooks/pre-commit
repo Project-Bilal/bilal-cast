@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""
+Pre-commit hook: bumps per-file versions in manifest.json for any staged app
+file, then refreshes version.txt. Run `make install-hooks` to activate.
+"""
+import json
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+MANIFEST = ROOT / "manifest.json"
+VERSION_FILE = ROOT / "version.txt"
+SKIP = {"manifest.json", "version.txt"}
+
+
+def staged_files():
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        capture_output=True, text=True, cwd=ROOT,
+    )
+    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
+def main():
+    staged = staged_files()
+    if not staged:
+        sys.exit(0)
+
+    with open(MANIFEST) as f:
+        manifest = json.load(f)
+
+    # Build a lookup from remote path -> manifest entry
+    by_remote = {entry["remote"]: entry for entry in manifest}
+
+    bumped = []
+    for path in staged:
+        if path in SKIP:
+            continue
+        if path in by_remote:
+            by_remote[path]["version"] = by_remote[path].get("version", 0) + 1
+            bumped.append("{} -> v{}".format(path, by_remote[path]["version"]))
+
+    if bumped:
+        with open(MANIFEST, "w") as f:
+            json.dump(manifest, f, indent=2)
+        print("OTA versions bumped:")
+        for b in bumped:
+            print(" ", b)
+
+    # Always refresh the global version timestamp
+    new_version = datetime.now().strftime("%Y-%m-%d-%H%M")
+    with open(VERSION_FILE, "w") as f:
+        f.write(new_version)
+
+    subprocess.run(["git", "add", str(MANIFEST), str(VERSION_FILE)], cwd=ROOT)
+
+
+if __name__ == "__main__":
+    main()
