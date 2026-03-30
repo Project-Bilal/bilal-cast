@@ -219,8 +219,8 @@ function scanDevices(){
   }
   for(var i=1;i<=254;i++){
     (function(host){
-      fetchWithTimeout('http://'+host+':8008/setup/eureka_info',600)
-      .then(function(r){return r.json();})
+      fetchWithTimeout('http://'+host+':8008/setup/eureka_info',2000)
+      .then(function(r){return r.ok?r.json():Promise.reject();})
       .then(function(d){if(d&&d.name)found.push(d.name);})
       .catch(function(){})
       .finally(function(){if(--pending===0)done();});
