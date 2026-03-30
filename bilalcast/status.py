@@ -8,7 +8,6 @@ import network  # pyright: ignore[reportMissingImports]
 from bilalcast.phew import server
 from bilalcast.phew.template import render_template
 from bilalcast.prayer import ATHANS_ORDER
-from bilalcast.logger import log, error
 
 
 def _rssi_svg(dbm_str):
@@ -154,6 +153,14 @@ def save_settings(form, config_file):
                 os.remove("cast_device.json")
             except Exception:
                 pass
+    cast_host = form.get("cast_device_host", "").strip()
+    cast_port_str = form.get("cast_device_port", "").strip()
+    if cast_host and cast_port_str:
+        try:
+            from bilalcast.discovery import _save_cast_cache
+            _save_cast_cache(cast_host, int(cast_port_str))
+        except Exception:
+            pass
     with open(config_file, "w") as f:
         json.dump(cfg, f)
     machine.Timer(-1).init(
@@ -210,22 +217,6 @@ def start_status_server(
             state["scan_in_progress"] = False
 
         asyncio.create_task(_scan())
-        return "ok", 200
-
-    @app.route("/cache-cast-device", methods=["POST"])
-    def cache_cast_device_route(request):
-        from bilalcast.discovery import _save_cast_cache
-        host = request.form.get("host", "").strip()
-        port_str = request.form.get("port", "").strip()
-        if host and port_str:
-            try:
-                port = int(port_str)
-                _save_cast_cache(host, port)
-                state["cast_host"] = host
-                state["cast_port"] = port
-                log("cast device cached: {}:{}".format(host, port))
-            except Exception as e:
-                error("cache-cast-device failed: " + str(e))
         return "ok", 200
 
     @app.route("/factory-reset", methods=["POST"])

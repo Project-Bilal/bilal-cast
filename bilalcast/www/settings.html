@@ -109,10 +109,12 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <div class=c>
 <b>Cast Device</b>
 <label>Device name (as shown in Google Home)</label>
-<input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" required>
-<select id=cdp style="display:none;margin-top:6px" onchange="pickDevice(this)">
+<select id=cdp style="display:none;margin-bottom:6px" onchange="pickDevice(this)">
 <option value='' disabled selected>Select a device&hellip;</option>
 </select>
+<input type=hidden name=cast_device_host id=cdh value="">
+<input type=hidden name=cast_device_port id=cdpo value="">
+<input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" required>
 <div style="margin-top:8px">
 <button type=button class=bt onclick="fetch('/test',{method:'POST'}).then(()=>alert('Test sent!'))">Test Speakers</button>
 <button type=button class=bg id=scb onclick="scanDevices()">Scan for Devices</button>
@@ -190,15 +192,15 @@ function pickDevice(sel){
   var opt=sel.options[sel.selectedIndex];
   if(!opt||!opt.value)return;
   var cdn=document.getElementById('cdn');
-  if(opt.value==='__other__'){cdn.value='';cdn.focus();return;}
-  cdn.value=opt.value;
-  if(opt.dataset.host&&opt.dataset.port){
-    fetch('/cache-cast-device',{
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'host='+encodeURIComponent(opt.dataset.host)+'&port='+encodeURIComponent(opt.dataset.port)
-    });
+  if(opt.value==='__other__'){
+    cdn.value='';
+    document.getElementById('cdh').value='';
+    document.getElementById('cdpo').value='';
+    cdn.focus();return;
   }
+  cdn.value=opt.value;
+  document.getElementById('cdh').value=opt.dataset.host||'';
+  document.getElementById('cdpo').value=opt.dataset.port||'';
 }
 
 function fillDeviceList(devices){
