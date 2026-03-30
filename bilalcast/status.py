@@ -199,6 +199,7 @@ def start_status_server(
         return "ok", 200
 
     @app.route("/icon.png", methods=["GET"])
+    @app.route("/favicon.ico", methods=["GET"])
     def icon_route(request):
         from bilalcast.icon_data import (  # pyright: ignore[reportMissingImports]
             DATA,
