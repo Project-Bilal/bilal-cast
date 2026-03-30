@@ -68,7 +68,6 @@ state = {
     "boot_epoch": 0,
     "device_name": None,
     "hostname": "bilalcast",
-    "cast_devices": [],
 }
 
 

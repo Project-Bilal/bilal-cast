@@ -34,6 +34,12 @@ def _rssi_svg(dbm_str):
     )
 
 
+def _label_12h(label):
+    if label and len(label) >= 5 and label[-3] == ":":
+        return label[:-5] + _fmt12(label[-5:])
+    return label
+
+
 def _fmt12(hhmm):
     h, m = hhmm.split(":")
     h = int(h)
@@ -68,9 +74,9 @@ def render_status(state):
             css = ""
         rows += "<tr" + css + "><td>" + p + "</td><td>" + display + "</td></tr>"
     if state["last_cast_ok"] is True:
-        lc = "<span class=ok>" + (state["last_cast_label"] or "") + " &#10003;</span>"
+        lc = "<span class=ok>" + _label_12h(state["last_cast_label"] or "") + " &#10003;</span>"
     elif state["last_cast_ok"] is False:
-        lc = "<span class=fl>" + (state["last_cast_label"] or "") + " &#10007;</span>"
+        lc = "<span class=fl>" + _label_12h(state["last_cast_label"] or "") + " &#10007;</span>"
     else:
         lc = "none yet"
     if state["cast_host"]:
@@ -108,6 +114,7 @@ def render_settings(state, pre_athan_mins, calc_method):
         midnight=str(state.get("midnight", 0)),
         school=str(state.get("school", 0)),
         cast_device_name=state["device_name"] or "",
+        local_ip=state["local_ip"] or "",
     )
 
 
@@ -184,26 +191,6 @@ def start_status_server(
     @app.route("/settings", methods=["POST"])
     def settings_save(request):
         return save_settings(request.form, config_file)
-
-    @app.route("/cast-devices", methods=["GET"])
-    def cast_devices_route(request):
-        return json.dumps({
-            "devices": state.get("cast_devices") or [],
-            "scanning": state.get("scan_in_progress", False),
-        }), 200, "application/json"
-
-    @app.route("/scan-cast-devices", methods=["POST"])
-    def scan_cast_devices_route(request):
-        from bilalcast.discovery import list_cast_devices
-
-        async def _scan():
-            state["scan_in_progress"] = True
-            names = await list_cast_devices(local_ip)
-            state["cast_devices"] = names
-            state["scan_in_progress"] = False
-
-        asyncio.create_task(_scan())
-        return "ok", 200
 
     @app.route("/factory-reset", methods=["POST"])
     def factory_reset_route(request):

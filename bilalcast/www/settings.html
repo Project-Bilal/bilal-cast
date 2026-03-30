@@ -109,8 +109,10 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <div class=c>
 <b>Cast Device</b>
 <label>Device name (as shown in Google Home)</label>
-<input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" required list=cdl>
-<datalist id=cdl></datalist>
+<input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" required>
+<select id=cdp style="display:none;margin-top:6px" onchange="pickDevice(this)">
+<option value='' disabled selected>Select a device&hellip;</option>
+</select>
 <div style="margin-top:8px">
 <button type=button class=bt onclick="fetch('/test',{method:'POST'}).then(()=>alert('Test sent!'))">Test Speakers</button>
 <button type=button class=bg id=scb onclick="scanDevices()">Scan for Devices</button>
@@ -184,29 +186,46 @@ function fmt12(hm){
   h=h%12||12;return h+':'+m+' '+s;
 }
 
-function fillDeviceList(names){
-  var dl=document.getElementById('cdl');
-  dl.innerHTML='';
-  names.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});
+var DEVICE_IP="{{local_ip}}";
+
+function fetchWithTimeout(url,ms){
+  var c=new AbortController();
+  setTimeout(function(){c.abort();},ms);
+  return fetch(url,{signal:c.signal});
 }
-fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){fillDeviceList(data.devices||data||[]);}).catch(function(){});
+
+function pickDevice(sel){
+  if(sel.value)document.getElementById('cdn').value=sel.value;
+}
+
+function fillDeviceList(names){
+  var sel=document.getElementById('cdp');
+  sel.innerHTML='<option value="" disabled selected>Select a device\u2026</option>';
+  names.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  sel.style.display=names.length?'block':'none';
+}
 
 function scanDevices(){
   var btn=document.getElementById('scb'),st=document.getElementById('scs');
   btn.disabled=true;st.innerHTML='<span class=spin></span> Scanning\u2026';
-  fetch('/scan-cast-devices',{method:'POST'}).then(function(){
-    var iv=setInterval(function(){
-      fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){
-        fillDeviceList(data.devices||[]);
-        if(!data.scanning){
-          clearInterval(iv);
-          var names=data.devices||[];
-          st.textContent=names.length?'Found '+names.length+' device'+(names.length===1?'':'s')+': '+names.join(', ')+'.':'No devices found.';
-          btn.disabled=false;
-        }
-      }).catch(function(){clearInterval(iv);btn.disabled=false;st.textContent='';});
-    },1500);
-  }).catch(function(){btn.disabled=false;st.textContent='';});
+  var parts=DEVICE_IP.split('.');
+  if(parts.length!==4){st.textContent='Device IP unavailable.';btn.disabled=false;return;}
+  var base=parts[0]+'.'+parts[1]+'.'+parts[2]+'.';
+  var found=[],pending=254;
+  function done(){
+    found.sort();fillDeviceList(found);
+    st.textContent=found.length?'Found '+found.length+' device'+(found.length===1?'':'s')+'.':'No Cast devices found.';
+    btn.disabled=false;
+  }
+  for(var i=1;i<=254;i++){
+    (function(host){
+      fetchWithTimeout('http://'+host+':8008/setup/eureka_info',600)
+      .then(function(r){return r.json();})
+      .then(function(d){if(d&&d.name)found.push(d.name);})
+      .catch(function(){})
+      .finally(function(){if(--pending===0)done();});
+    })(base+i);
+  }
 }
 
 pb.addEventListener('click',function(){
