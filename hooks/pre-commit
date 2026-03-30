@@ -6,7 +6,6 @@ file, then refreshes version.txt. Run `make install-hooks` to activate.
 import json
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,10 +48,14 @@ def main():
         for b in bumped:
             print(" ", b)
 
-    # Always refresh the global version timestamp
-    new_version = datetime.now().strftime("%Y-%m-%d-%H%M")
+    # Always increment the global version counter
+    try:
+        with open(VERSION_FILE) as f:
+            current = int(f.read().strip())
+    except Exception:
+        current = 0
     with open(VERSION_FILE, "w") as f:
-        f.write(new_version)
+        f.write(str(current + 1))
 
     subprocess.run(["git", "add", str(MANIFEST), str(VERSION_FILE)], cwd=ROOT)
 

@@ -42,7 +42,8 @@
       "Bash(sort -k1 -nr)",
       "Bash(chmod:*)",
       "Bash(sort echo:*)",
-      "Bash(make install-hooks:*)"
+      "Bash(make install-hooks:*)",
+      "Bash(git -C /Users/omars/stash/bilal-cast log --oneline -5)"
     ]
   }
 }
