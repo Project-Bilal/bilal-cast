@@ -8,6 +8,7 @@ OTA_BRANCH = "main"
 
 _RAW = "https://raw.githubusercontent.com/{}/{}/{}".format(OTA_OWNER, OTA_REPO, OTA_BRANCH)
 _VER_FILE = "ota_version.txt"
+_FILE_VERS = "ota_file_versions.json"
 
 
 def _local_version():
@@ -77,28 +78,56 @@ def _fetch_manifest():
     return None
 
 
-def download_all():
-    """Download all OTA app files listed in manifest.json. Returns True if all succeeded."""
-    manifest = _fetch_manifest()
-    if manifest is None:
-        print("OTA: could not fetch manifest")
-        return False
+def _load_file_versions():
+    try:
+        with open(_FILE_VERS) as f:
+            return json.loads(f.read())
+    except Exception:
+        return {}
+
+
+def _save_file_versions(versions):
+    try:
+        with open(_FILE_VERS, "w") as f:
+            f.write(json.dumps(versions))
+    except Exception as e:
+        print("OTA: file versions save failed:", e)
+
+
+def download_changed(manifest):
+    """Download only files whose version differs from the locally recorded version.
+    Returns True if all attempted downloads succeeded."""
+    local_vers = _load_file_versions()
     failed = 0
+    updated = {}
     for entry in manifest:
+        remote_v = entry.get("version")
+        local_v = local_vers.get(entry["local"])
+        if remote_v is not None and remote_v == local_v:
+            continue
         url = _RAW + "/" + entry["remote"]
-        if not _download(url, entry["local"]):
+        if _download(url, entry["local"]):
+            updated[entry["local"]] = remote_v
+        else:
             failed += 1
+    if updated:
+        local_vers.update(updated)
+        _save_file_versions(local_vers)
     return failed == 0
 
 
 def check_and_update():
-    """Check remote version; download everything if outdated. Returns True if updated."""
+    """Check remote version; download only changed files if outdated. Returns True if updated."""
     local_v = _local_version()
     remote_v = _remote_version()
     if remote_v is None or local_v == remote_v:
         return False
     print("OTA: updating", local_v, "->", remote_v)
-    if download_all():
+    manifest = _fetch_manifest()
+    if manifest is None:
+        print("OTA: could not fetch manifest")
+        return False
+    if download_changed(manifest):
         try:
             with open(_VER_FILE, "w") as f:
                 f.write(remote_v)

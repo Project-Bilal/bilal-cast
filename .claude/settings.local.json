@@ -41,7 +41,8 @@
       "Bash(find /Users/omars/stash/bilal-cast/bilalcast -maxdepth 1 -name \"*.py\" -type f -exec wc -l {})",
       "Bash(sort -k1 -nr)",
       "Bash(chmod:*)",
-      "Bash(sort echo:*)"
+      "Bash(sort echo:*)",
+      "Bash(make install-hooks:*)"
     ]
   }
 }

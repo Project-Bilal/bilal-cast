@@ -203,6 +203,16 @@ docker run -v $(pwd):/tmp/bilalcast-build bilalcast-rp2
 
 Use the `/build` skill as a shortcut — it runs both commands in sequence.
 
+## Development setup
+
+After cloning, run once to install the git hooks:
+
+```bash
+make install-hooks
+```
+
+This installs `hooks/pre-commit` into `.git/hooks/`. It automatically bumps the version of any staged app file in `manifest.json` and refreshes `version.txt` on every commit. Required for OTA per-file version tracking to work correctly.
+
 ---
 
 ## Coding conventions

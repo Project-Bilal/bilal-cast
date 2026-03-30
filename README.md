@@ -27,6 +27,16 @@ The device uses a captive portal for onboarding — no app required.
 
 Hold the **BOOTSEL** button for 10 seconds while the device is booting. The LED will go solid then resume blinking to confirm. The device will clear its config and reopen the captive portal.
 
+## Development setup
+
+After cloning, install the git hooks:
+
+```bash
+make install-hooks
+```
+
+This sets up a pre-commit hook that automatically bumps per-file OTA versions in `manifest.json` whenever you commit a change to an app file.
+
 ## Building the firmware
 
 The UF2 firmware is built via Docker. Requires Docker installed and running.
