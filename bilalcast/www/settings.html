@@ -31,12 +31,14 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 #pv tr:nth-child(odd){background:#f4f6f9}
 .spin{display:inline-block;width:12px;height:12px;border:2px solid #ccc;border-top-color:#1a73e8;border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle;margin-right:4px}
 @keyframes sp{to{transform:rotate(360deg)}}
-.vg{display:grid;grid-template-columns:80px 1fr auto;align-items:center;gap:6px 10px;margin-top:8px}
-.vg span{font-size:.9rem;color:#666}
-.vg input[type=range]{-webkit-appearance:none;appearance:none;padding:0;border:none;width:100%;height:2px;background:#ddd;border-radius:1px;outline:none;cursor:pointer}
-.vg input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#1a73e8;cursor:pointer}
-.vg input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#1a73e8;border:none;cursor:pointer}
-.vg .vn{font-size:.85rem;color:#888;text-align:right;width:36px;flex-shrink:0}
+.vg{margin-top:8px}
+.vr{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0}
+.vr:last-child{border-bottom:none}
+.vr>span{font-size:.9rem;color:#444}
+.st{display:flex;align-items:center;gap:12px}
+.st button{width:30px;height:30px;border-radius:50%;border:1px solid #ddd;background:#f4f6f9;color:#333;font-size:1.1rem;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.st button:active{background:#e0e0e0}
+.sv{font-size:.9rem;color:#333;width:36px;text-align:center}
 </style>
 </head>
 <body>
@@ -88,21 +90,11 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 </select>
 <label style="margin-top:14px">Prayer volumes</label>
 <div class=vg>
-<span>Fajr</span>
-<input type=range name=vol_fajr min=0 max=100 step=10 value="{{vol_fajr}}" oninput="this.nextElementSibling.textContent=this.value+'%'">
-<div class=vn>{{vol_fajr}}%</div>
-<span>Dhuhr</span>
-<input type=range name=vol_dhuhr min=0 max=100 step=10 value="{{vol_dhuhr}}" oninput="this.nextElementSibling.textContent=this.value+'%'">
-<div class=vn>{{vol_dhuhr}}%</div>
-<span>Asr</span>
-<input type=range name=vol_asr min=0 max=100 step=10 value="{{vol_asr}}" oninput="this.nextElementSibling.textContent=this.value+'%'">
-<div class=vn>{{vol_asr}}%</div>
-<span>Maghrib</span>
-<input type=range name=vol_maghrib min=0 max=100 step=10 value="{{vol_maghrib}}" oninput="this.nextElementSibling.textContent=this.value+'%'">
-<div class=vn>{{vol_maghrib}}%</div>
-<span>Isha</span>
-<input type=range name=vol_isha min=0 max=100 step=10 value="{{vol_isha}}" oninput="this.nextElementSibling.textContent=this.value+'%'">
-<div class=vn>{{vol_isha}}%</div>
+<div class=vr><span>Fajr</span><div class=st><button type=button onclick="sv(this,-10)">&#8722;</button><span class=sv></span><button type=button onclick="sv(this,10)">+</button><input type=hidden name=vol_fajr value="{{vol_fajr}}"></div></div>
+<div class=vr><span>Dhuhr</span><div class=st><button type=button onclick="sv(this,-10)">&#8722;</button><span class=sv></span><button type=button onclick="sv(this,10)">+</button><input type=hidden name=vol_dhuhr value="{{vol_dhuhr}}"></div></div>
+<div class=vr><span>Asr</span><div class=st><button type=button onclick="sv(this,-10)">&#8722;</button><span class=sv></span><button type=button onclick="sv(this,10)">+</button><input type=hidden name=vol_asr value="{{vol_asr}}"></div></div>
+<div class=vr><span>Maghrib</span><div class=st><button type=button onclick="sv(this,-10)">&#8722;</button><span class=sv></span><button type=button onclick="sv(this,10)">+</button><input type=hidden name=vol_maghrib value="{{vol_maghrib}}"></div></div>
+<div class=vr><span>Isha</span><div class=st><button type=button onclick="sv(this,-10)">&#8722;</button><span class=sv></span><button type=button onclick="sv(this,10)">+</button><input type=hidden name=vol_isha value="{{vol_isha}}"></div></div>
 </div>
 </div>
 
@@ -261,6 +253,18 @@ function scanDevices(){
       }).catch(function(){clearInterval(iv);btn.disabled=false;st.textContent='';});
     },1500);
   }).catch(function(){btn.disabled=false;st.textContent='';});
+}
+
+document.querySelectorAll('.st').forEach(function(el){
+  var v=parseInt(el.querySelector('input').value);
+  el.querySelector('.sv').textContent=v===0?'Off':v+'%';
+});
+function sv(btn,d){
+  var el=btn.parentElement;
+  var inp=el.querySelector('input');
+  var v=Math.max(0,Math.min(100,parseInt(inp.value)+d));
+  inp.value=v;
+  el.querySelector('.sv').textContent=v===0?'Off':v+'%';
 }
 
 pb.addEventListener('click',function(){
