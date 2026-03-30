@@ -138,13 +138,14 @@ async def resolve_cast_device(local_ip, name):
     return None, None
 
 
-def cast_url(url, host, port, max_retries=3):
+def cast_url(url, host, port, volume=0.5, max_retries=3):
     last_error = "transport_id timeout"
     for attempt in range(1, max_retries + 1):
         cc = None
         ok = False
         try:
             cc = Chromecast(host, port)
+            cc.set_volume(volume)
             if cc.play_url(url):
                 ok = True
                 return True, None

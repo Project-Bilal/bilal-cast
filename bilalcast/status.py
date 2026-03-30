@@ -102,7 +102,10 @@ def render_status(state):
     )
 
 
-def render_settings(state, pre_athan_mins, calc_method):
+def render_settings(state, pre_athan_mins, calc_method, prayer_volumes):
+    vols = {}
+    for p in ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]:
+        vols[p] = str(round(prayer_volumes.get(p, 0.5) * 100))
     return render_template(
         "www/settings.html",
         address=str(state.get("address") or ""),
@@ -115,6 +118,11 @@ def render_settings(state, pre_athan_mins, calc_method):
         school=str(state.get("school", 0)),
         cast_device_name=state["device_name"] or "",
         local_ip=state["local_ip"] or "",
+        vol_fajr=vols["Fajr"],
+        vol_dhuhr=vols["Dhuhr"],
+        vol_asr=vols["Asr"],
+        vol_maghrib=vols["Maghrib"],
+        vol_isha=vols["Isha"],
     )
 
 
@@ -126,6 +134,12 @@ def save_settings(form, config_file):
     cfg["lat_adj"] = form.get("lat_adj", "1").strip()
     cfg["midnight"] = form.get("midnight", "0").strip()
     cfg["school"] = form.get("school", "0").strip()
+    for _p in ["fajr", "dhuhr", "asr", "maghrib", "isha"]:
+        _k = "vol_" + _p
+        try:
+            cfg[_k] = str(max(0, min(100, int(form.get(_k, "50").strip()))))
+        except Exception:
+            cfg[_k] = "50"
     lat_val = form.get("lat", "").strip()
     lon_val = form.get("lon", "").strip()
     address_val = form.get("address", "").strip()
@@ -171,7 +185,7 @@ def save_settings(form, config_file):
 
 
 def start_status_server(
-    state, pre_athan_mins, calc_method, config_file, activation_url, do_cast, local_ip
+    state, pre_athan_mins, calc_method, prayer_volumes, config_file, activation_url, do_cast, local_ip
 ):
     app = server.Phew()
 
@@ -194,7 +208,7 @@ def start_status_server(
 
     @app.route("/settings", methods=["GET"])
     def settings_page(request):
-        return render_settings(state, pre_athan_mins, calc_method)
+        return render_settings(state, pre_athan_mins, calc_method, prayer_volumes)
 
     @app.route("/settings", methods=["POST"])
     def settings_save(request):

@@ -31,6 +31,10 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 #pv tr:nth-child(odd){background:#f4f6f9}
 .spin{display:inline-block;width:12px;height:12px;border:2px solid #ccc;border-top-color:#1a73e8;border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle;margin-right:4px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.vg{display:grid;grid-template-columns:80px 1fr auto;align-items:center;gap:6px 10px;margin-top:8px}
+.vg span{font-size:.9rem;font-weight:600;color:#444}
+.vg input[type=range]{padding:0;border:none;width:100%}
+.vg .vn{font-size:.85rem;color:#555;text-align:right;min-width:28px}
 </style>
 </head>
 <body>
@@ -38,6 +42,7 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <form method=post action=/settings id=sf>
 <input type=hidden name=lat id=lv value="{{lat}}">
 <input type=hidden name=lon id=ov value="{{lon}}">
+
 <div class=c>
 <b>Location</b>
 <p class=hint>Type a city or address. Select a suggestion to lock exact coordinates, or leave as-is for address-based lookup.</p>
@@ -51,61 +56,7 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <button type=button class=bp id=pb style="margin-top:8px">Preview Prayer Times</button>
 <div id=pv></div>
 </div>
-<div class=c>
-<b>Pre-Prayer Notification</b>
-<label>Play reminder before each prayer</label>
-<select name=pre_athan_mins>
-<option value=0 {{"selected" if pre_athan_mins=="0" else ""}}>Off</option>
-<option value=5 {{"selected" if pre_athan_mins=="5" else ""}}>5 minutes before</option>
-<option value=10 {{"selected" if pre_athan_mins=="10" else ""}}>10 minutes before</option>
-<option value=15 {{"selected" if pre_athan_mins=="15" else ""}}>15 minutes before</option>
-<option value=20 {{"selected" if pre_athan_mins=="20" else ""}}>20 minutes before</option>
-<option value=30 {{"selected" if pre_athan_mins=="30" else ""}}>30 minutes before</option>
-</select>
-</div>
-<div class=c>
-<b>Prayer Calculation Method</b>
-<label>Aladhan calculation authority</label>
-<select name=method>
-<option value=1 {{"selected" if method=="1" else ""}}>University of Islamic Sciences, Karachi</option>
-<option value=2 {{"selected" if method=="2" else ""}}>Islamic Society of North America (ISNA)</option>
-<option value=3 {{"selected" if method=="3" else ""}}>Muslim World League</option>
-<option value=4 {{"selected" if method=="4" else ""}}>Umm Al-Qura University, Makkah</option>
-<option value=5 {{"selected" if method=="5" else ""}}>Egyptian General Authority of Survey</option>
-<option value=9 {{"selected" if method=="9" else ""}}>Kuwait</option>
-<option value=10 {{"selected" if method=="10" else ""}}>Qatar</option>
-<option value=15 {{"selected" if method=="15" else ""}}>Moonsighting Committee Worldwide</option>
-</select>
-</div>
-<div class=c>
-<b>Latitude Adjustment Method</b>
-<p class=hint>How to handle high-latitude locations where standard calculation may not apply.</p>
-<label>High-latitude adjustment</label>
-<select name=lat_adj>
-<option value=0 {{"selected" if lat_adj=="0" else ""}}>None</option>
-<option value=1 {{"selected" if lat_adj=="1" else ""}}>Middle of Night</option>
-<option value=2 {{"selected" if lat_adj=="2" else ""}}>One-Seventh of Night</option>
-<option value=3 {{"selected" if lat_adj=="3" else ""}}>Angle-Based</option>
-</select>
-</div>
-<div class=c>
-<b>Asr Calculation</b>
-<p class=hint>Determines the shadow length used to calculate Asr prayer time.</p>
-<label>Juristic school</label>
-<select name=school>
-<option value=0 {{"selected" if school=="0" else ""}}>Standard / Shafi (shadow factor 1×)</option>
-<option value=1 {{"selected" if school=="1" else ""}}>Hanafi (shadow factor 2×)</option>
-</select>
-</div>
-<div class=c>
-<b>Midnight Mode</b>
-<p class=hint>Defines when Islamic midnight falls, used by some calculation methods.</p>
-<label>Midnight calculation</label>
-<select name=midnight>
-<option value=0 {{"selected" if midnight=="0" else ""}}>Standard (midpoint of sunset to sunrise)</option>
-<option value=1 {{"selected" if midnight=="1" else ""}}>Jafari (midpoint of sunset to Fajr)</option>
-</select>
-</div>
+
 <div class=c>
 <b>Cast Device</b>
 <label>Device name (as shown in Google Home)</label>
@@ -121,6 +72,73 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 </div>
 <p id=scs class=hint></p>
 </div>
+
+<div class=c>
+<b>Pre-Prayer Notification &amp; Volume</b>
+<label>Play reminder before each prayer</label>
+<select name=pre_athan_mins>
+<option value=0 {{"selected" if pre_athan_mins=="0" else ""}}>Off</option>
+<option value=5 {{"selected" if pre_athan_mins=="5" else ""}}>5 minutes before</option>
+<option value=10 {{"selected" if pre_athan_mins=="10" else ""}}>10 minutes before</option>
+<option value=15 {{"selected" if pre_athan_mins=="15" else ""}}>15 minutes before</option>
+<option value=20 {{"selected" if pre_athan_mins=="20" else ""}}>20 minutes before</option>
+<option value=30 {{"selected" if pre_athan_mins=="30" else ""}}>30 minutes before</option>
+</select>
+<label style="margin-top:14px">Prayer volumes</label>
+<div class=vg>
+<span>Fajr</span>
+<input type=range name=vol_fajr min=0 max=100 value="{{vol_fajr}}" oninput="this.nextElementSibling.textContent=this.value">
+<div class=vn>{{vol_fajr}}</div>
+<span>Dhuhr</span>
+<input type=range name=vol_dhuhr min=0 max=100 value="{{vol_dhuhr}}" oninput="this.nextElementSibling.textContent=this.value">
+<div class=vn>{{vol_dhuhr}}</div>
+<span>Asr</span>
+<input type=range name=vol_asr min=0 max=100 value="{{vol_asr}}" oninput="this.nextElementSibling.textContent=this.value">
+<div class=vn>{{vol_asr}}</div>
+<span>Maghrib</span>
+<input type=range name=vol_maghrib min=0 max=100 value="{{vol_maghrib}}" oninput="this.nextElementSibling.textContent=this.value">
+<div class=vn>{{vol_maghrib}}</div>
+<span>Isha</span>
+<input type=range name=vol_isha min=0 max=100 value="{{vol_isha}}" oninput="this.nextElementSibling.textContent=this.value">
+<div class=vn>{{vol_isha}}</div>
+</div>
+</div>
+
+<div class=c>
+<b>Prayer Calculation</b>
+<label>Calculation authority</label>
+<select name=method>
+<option value=1 {{"selected" if method=="1" else ""}}>University of Islamic Sciences, Karachi</option>
+<option value=2 {{"selected" if method=="2" else ""}}>Islamic Society of North America (ISNA)</option>
+<option value=3 {{"selected" if method=="3" else ""}}>Muslim World League</option>
+<option value=4 {{"selected" if method=="4" else ""}}>Umm Al-Qura University, Makkah</option>
+<option value=5 {{"selected" if method=="5" else ""}}>Egyptian General Authority of Survey</option>
+<option value=9 {{"selected" if method=="9" else ""}}>Kuwait</option>
+<option value=10 {{"selected" if method=="10" else ""}}>Qatar</option>
+<option value=15 {{"selected" if method=="15" else ""}}>Moonsighting Committee Worldwide</option>
+</select>
+<label>High-latitude adjustment</label>
+<p class=hint>How to handle locations where standard calculation may not apply.</p>
+<select name=lat_adj>
+<option value=0 {{"selected" if lat_adj=="0" else ""}}>None</option>
+<option value=1 {{"selected" if lat_adj=="1" else ""}}>Middle of Night</option>
+<option value=2 {{"selected" if lat_adj=="2" else ""}}>One-Seventh of Night</option>
+<option value=3 {{"selected" if lat_adj=="3" else ""}}>Angle-Based</option>
+</select>
+<label>Asr juristic school</label>
+<p class=hint>Determines the shadow length used to calculate Asr time.</p>
+<select name=school>
+<option value=0 {{"selected" if school=="0" else ""}}>Standard / Shafi (shadow factor 1&times;)</option>
+<option value=1 {{"selected" if school=="1" else ""}}>Hanafi (shadow factor 2&times;)</option>
+</select>
+<label>Midnight calculation</label>
+<p class=hint>Defines when Islamic midnight falls, used by some methods.</p>
+<select name=midnight>
+<option value=0 {{"selected" if midnight=="0" else ""}}>Standard (midpoint of sunset to sunrise)</option>
+<option value=1 {{"selected" if midnight=="1" else ""}}>Jafari (midpoint of sunset to Fajr)</option>
+</select>
+</div>
+
 <div class=c>
 <button type=submit class=bt>Save &amp; Reboot</button>
 <a href=/><button type=button class=bg>Cancel</button></a>

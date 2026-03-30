@@ -41,6 +41,7 @@ CALC_METHOD = 2
 LAT_ADJ_METHOD = 1
 MIDNIGHT_MODE = 0
 SCHOOL = 0
+PRAYER_VOLUMES = {"Fajr": 0.5, "Dhuhr": 0.5, "Asr": 0.5, "Maghrib": 0.5, "Isha": 0.5}
 _cfg_lat = None
 _cfg_lon = None
 _cfg_address = None
@@ -274,7 +275,7 @@ def _save_cast_state(ok, label):
         error("cast state save failed: " + str(e))
 
 
-async def do_cast(url, label):
+async def do_cast(url, label, volume=0.5):
     ensure_wifi()
     if state["cast_host"] is None:
         log("Cast host unknown, attempting re-discovery...")
@@ -291,7 +292,7 @@ async def do_cast(url, label):
             )
             _save_cast_state(False, label)
             return
-    ok, cast_error = cast_url(url, state["cast_host"], state["cast_port"])
+    ok, cast_error = cast_url(url, state["cast_host"], state["cast_port"], volume=volume)
     _save_cast_state(ok, label)
     if ok:
         send_ntfy(label, priority=3, tags=["bell"])
@@ -315,6 +316,8 @@ async def run_schedule():
             state["next_prayer"] = prayer
             state["next_prayer_time"] = t
 
+            vol = PRAYER_VOLUMES.get(prayer, 0.5)
+
             if PRE_ATHAN_MINS > 0:
                 pre_t = pre_athan_time(t, PRE_ATHAN_MINS)
                 if not _time_passed(pre_t):
@@ -322,14 +325,14 @@ async def run_schedule():
                     if secs_to_pre > 0:
                         await asyncio.sleep(secs_to_pre)
                     asyncio.create_task(
-                        do_cast(PRE_ATHAN, "pre_{}, {}".format(prayer, pre_t))
+                        do_cast(PRE_ATHAN, "pre_{}, {}".format(prayer, pre_t), vol)
                     )
 
             secs_to_prayer = seconds_until(t)
             if secs_to_prayer > 0:
                 await asyncio.sleep(secs_to_prayer)
 
-            await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t))
+            await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
             await asyncio.sleep(200)
 
         # All today's prayers done — wait for local midnight, re-sync, re-fetch
@@ -351,7 +354,7 @@ async def run_schedule():
 
 
 async def main():
-    global SSID, PASSWORD, CAST_DEVICE_NAME, PRE_ATHAN_MINS, CALC_METHOD, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL, _cfg_lat, _cfg_lon, _cfg_address, _tz_string
+    global SSID, PASSWORD, CAST_DEVICE_NAME, PRE_ATHAN_MINS, CALC_METHOD, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL, PRAYER_VOLUMES, _cfg_lat, _cfg_lon, _cfg_address, _tz_string
 
     logger.configure(True, None)  # always print before WiFi is up
     led_blink()
@@ -388,6 +391,9 @@ async def main():
     _cfg_lat = config.get("lat")
     _cfg_lon = config.get("lon")
     _cfg_address = config.get("address")
+    for _p in ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]:
+        _k = "vol_" + _p.lower()
+        PRAYER_VOLUMES[_p] = int(config.get(_k, "50")) / 100.0
 
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD, hostname=DEVICE_HOSTNAME)
     logger.configure(DEBUG, CAST_DEVICE_NAME)
@@ -407,7 +413,7 @@ async def main():
     except Exception:
         pass
 
-    start_status_server(state, PRE_ATHAN_MINS, CALC_METHOD, CONFIG_FILE, ACTIVATION_URL, do_cast, local_ip)
+    start_status_server(state, PRE_ATHAN_MINS, CALC_METHOD, PRAYER_VOLUMES, CONFIG_FILE, ACTIVATION_URL, do_cast, local_ip)
     start_mdns_responder(local_ip, local_ip)
 
     try:
