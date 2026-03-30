@@ -186,46 +186,59 @@ function fmt12(hm){
   h=h%12||12;return h+':'+m+' '+s;
 }
 
-var DEVICE_IP="{{local_ip}}";
-
-function fetchWithTimeout(url,ms){
-  var c=new AbortController();
-  setTimeout(function(){c.abort();},ms);
-  return fetch(url,{signal:c.signal});
-}
-
 function pickDevice(sel){
-  if(sel.value)document.getElementById('cdn').value=sel.value;
+  var opt=sel.options[sel.selectedIndex];
+  if(!opt||!opt.value)return;
+  var cdn=document.getElementById('cdn');
+  if(opt.value==='__other__'){cdn.value='';cdn.focus();return;}
+  cdn.value=opt.value;
+  if(opt.dataset.host&&opt.dataset.port){
+    fetch('/cache-cast-device',{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'host='+encodeURIComponent(opt.dataset.host)+'&port='+encodeURIComponent(opt.dataset.port)
+    });
+  }
 }
 
-function fillDeviceList(names){
+function fillDeviceList(devices){
   var sel=document.getElementById('cdp');
   sel.innerHTML='<option value="" disabled selected>Select a device\u2026</option>';
-  names.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
-  sel.style.display=names.length?'block':'none';
+  devices.forEach(function(d){
+    var o=document.createElement('option');
+    var name=d.name||d;
+    o.value=name;
+    o.textContent=name+(d.host?' \u00b7 '+d.host:'');
+    if(d.host)o.dataset.host=d.host;
+    if(d.port)o.dataset.port=d.port;
+    sel.appendChild(o);
+  });
+  var other=document.createElement('option');
+  other.value='__other__';other.textContent='Other (type below)';
+  sel.appendChild(other);
+  sel.style.display=devices.length?'block':'none';
 }
+
+fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){
+  var devices=data.devices||[];if(devices.length)fillDeviceList(devices);
+}).catch(function(){});
 
 function scanDevices(){
   var btn=document.getElementById('scb'),st=document.getElementById('scs');
   btn.disabled=true;st.innerHTML='<span class=spin></span> Scanning\u2026';
-  var parts=DEVICE_IP.split('.');
-  if(parts.length!==4){st.textContent='Device IP unavailable.';btn.disabled=false;return;}
-  var base=parts[0]+'.'+parts[1]+'.'+parts[2]+'.';
-  var found=[],pending=254;
-  function done(){
-    found.sort();fillDeviceList(found);
-    st.textContent=found.length?'Found '+found.length+' device'+(found.length===1?'':'s')+'.':'No Cast devices found.';
-    btn.disabled=false;
-  }
-  for(var i=1;i<=254;i++){
-    (function(host){
-      fetchWithTimeout('http://'+host+':8008/setup/eureka_info',2000)
-      .then(function(r){return r.ok?r.json():Promise.reject();})
-      .then(function(d){if(d&&d.name)found.push(d.name);})
-      .catch(function(){})
-      .finally(function(){if(--pending===0)done();});
-    })(base+i);
-  }
+  fetch('/scan-cast-devices',{method:'POST'}).then(function(){
+    var iv=setInterval(function(){
+      fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){
+        if(!data.scanning){
+          clearInterval(iv);
+          var devices=data.devices||[];
+          fillDeviceList(devices);
+          st.textContent=devices.length?'Found '+devices.length+' device'+(devices.length===1?'':'s')+'.':'No devices found.';
+          btn.disabled=false;
+        }
+      }).catch(function(){clearInterval(iv);btn.disabled=false;st.textContent='';});
+    },1500);
+  }).catch(function(){btn.disabled=false;st.textContent='';});
 }
 
 pb.addEventListener('click',function(){

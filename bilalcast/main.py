@@ -64,6 +64,7 @@ state = {
     "lat_adj": 1,
     "midnight": 0,
     "school": 0,
+    "cast_devices": [],
     "local_ip": None,
     "boot_epoch": 0,
     "device_name": None,

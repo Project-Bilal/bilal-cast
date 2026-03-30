@@ -192,6 +192,41 @@ def start_status_server(
     def settings_save(request):
         return save_settings(request.form, config_file)
 
+    @app.route("/cast-devices", methods=["GET"])
+    def cast_devices_route(request):
+        return json.dumps({
+            "devices": state.get("cast_devices") or [],
+            "scanning": state.get("scan_in_progress", False),
+        }), 200, "application/json"
+
+    @app.route("/scan-cast-devices", methods=["POST"])
+    def scan_cast_devices_route(request):
+        from bilalcast.discovery import list_cast_devices
+
+        async def _scan():
+            state["scan_in_progress"] = True
+            state["cast_devices"] = await list_cast_devices(local_ip)
+            state["scan_in_progress"] = False
+
+        asyncio.create_task(_scan())
+        return "ok", 200
+
+    @app.route("/cache-cast-device", methods=["POST"])
+    def cache_cast_device_route(request):
+        from bilalcast.discovery import _save_cast_cache
+        host = request.form.get("host", "").strip()
+        port_str = request.form.get("port", "").strip()
+        if host and port_str:
+            try:
+                port = int(port_str)
+                _save_cast_cache(host, port)
+                state["cast_host"] = host
+                state["cast_port"] = port
+                log("cast device cached: {}:{}".format(host, port))
+            except Exception as e:
+                error("cache-cast-device failed: " + str(e))
+        return "ok", 200
+
     @app.route("/factory-reset", methods=["POST"])
     def factory_reset_route(request):
         for f in (config_file, "cast_device.json", "cast_state.json"):
