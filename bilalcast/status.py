@@ -213,7 +213,14 @@ def start_status_server(
 
         async def _scan():
             state["scan_in_progress"] = True
-            state["cast_devices"] = await list_cast_devices(local_ip)
+            new_devices = await list_cast_devices(local_ip)
+            existing = state.get("cast_devices") or []
+            existing_names = [d["name"] for d in existing]
+            for d in new_devices:
+                if d["name"] not in existing_names:
+                    existing.append(d)
+                    existing_names.append(d["name"])
+            state["cast_devices"] = existing
             state["scan_in_progress"] = False
 
         asyncio.create_task(_scan())
