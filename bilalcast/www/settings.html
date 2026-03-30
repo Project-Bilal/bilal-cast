@@ -71,7 +71,7 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <input type=hidden name=cast_device_port id=cdpo value="">
 <input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" placeholder="e.g. Living Room">
 <div style="margin-top:8px">
-<button type=button class=bt onclick="fetch('/test',{method:'POST'}).then(()=>alert('Test sent!'))">Test Speakers</button>
+<button type=button class=bt id=tsb style="display:none" onclick="fetch('/test',{method:'POST'}).then(()=>alert('Test sent!'))">Test Speakers</button>
 <button type=button class=bg id=scb onclick="scanDevices()">Scan for Devices</button>
 </div>
 <p id=scs class=hint></p>
@@ -200,6 +200,15 @@ function fmt12(hm){
   h=h%12||12;return h+':'+m+' '+s;
 }
 
+function updateTestBtn(){
+  var cdn=document.getElementById('cdn');
+  var tsb=document.getElementById('tsb');
+  tsb.style.display=cdn.value.trim()?'inline-block':'none';
+}
+
+document.getElementById('cdn').addEventListener('input',updateTestBtn);
+updateTestBtn();
+
 function pickDevice(sel){
   var opt=sel.options[sel.selectedIndex];
   if(!opt||!opt.value)return;
@@ -208,12 +217,13 @@ function pickDevice(sel){
     cdn.value='';
     document.getElementById('cdh').value='';
     document.getElementById('cdpo').value='';
-    cdn.style.display='block';cdn.focus();return;
+    cdn.style.display='block';cdn.focus();updateTestBtn();return;
   }
   cdn.value=opt.value;
   cdn.style.display='none';
   document.getElementById('cdh').value=opt.dataset.host||'';
   document.getElementById('cdpo').value=opt.dataset.port||'';
+  updateTestBtn();
 }
 
 function fillDeviceList(devices){
@@ -246,9 +256,7 @@ function fillDeviceList(devices){
   }
 }
 
-fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){
-  var devices=data.devices||[];if(devices.length)fillDeviceList(devices);
-}).catch(function(){});
+scanDevices();
 
 function scanDevices(){
   var btn=document.getElementById('scb'),st=document.getElementById('scs');
