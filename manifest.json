@@ -77,7 +77,7 @@
   {
     "remote": "bilalcast/ota.py",
     "local": "bilalcast/ota.py",
-    "version": 2
+    "version": 3
   },
   {
     "remote": "bilalcast/phew/__init__.py",
@@ -112,7 +112,7 @@
   {
     "remote": "bilalcast/www/settings.html",
     "local": "www/settings.html",
-    "version": 1
+    "version": 2
   },
   {
     "remote": "bilalcast/www/status.html",

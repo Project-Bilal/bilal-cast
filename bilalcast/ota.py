@@ -94,6 +94,15 @@ def _save_file_versions(versions):
         print("OTA: file versions save failed:", e)
 
 
+def download_all():
+    """Download all app files (first-boot install). Returns True if all succeeded."""
+    manifest = _fetch_manifest()
+    if manifest is None:
+        print("OTA: could not fetch manifest")
+        return False
+    return download_changed(manifest)
+
+
 def download_changed(manifest):
     """Download only files whose version differs from the locally recorded version.
     Returns True if all attempted downloads succeeded."""

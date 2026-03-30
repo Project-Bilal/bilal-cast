@@ -69,7 +69,7 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 </select>
 <input type=hidden name=cast_device_host id=cdh value="">
 <input type=hidden name=cast_device_port id=cdpo value="">
-<input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" required>
+<input type=text name=cast_device_name id=cdn value="{{cast_device_name}}" placeholder="e.g. Living Room">
 <div style="margin-top:8px">
 <button type=button class=bt onclick="fetch('/test',{method:'POST'}).then(()=>alert('Test sent!'))">Test Speakers</button>
 <button type=button class=bg id=scb onclick="scanDevices()">Scan for Devices</button>
@@ -208,15 +208,18 @@ function pickDevice(sel){
     cdn.value='';
     document.getElementById('cdh').value='';
     document.getElementById('cdpo').value='';
-    cdn.focus();return;
+    cdn.style.display='block';cdn.focus();return;
   }
   cdn.value=opt.value;
+  cdn.style.display='none';
   document.getElementById('cdh').value=opt.dataset.host||'';
   document.getElementById('cdpo').value=opt.dataset.port||'';
 }
 
 function fillDeviceList(devices){
   var sel=document.getElementById('cdp');
+  var cdn=document.getElementById('cdn');
+  var currentName=cdn.value;
   sel.innerHTML='<option value="" disabled selected>Select a device\u2026</option>';
   devices.forEach(function(d){
     var o=document.createElement('option');
@@ -231,6 +234,16 @@ function fillDeviceList(devices){
   other.value='__other__';other.textContent='Other (type below)';
   sel.appendChild(other);
   sel.style.display=devices.length?'block':'none';
+  // Auto-select the current device name if it appears in the list
+  if(devices.length){
+    var matched=false;
+    for(var i=0;i<sel.options.length;i++){
+      if(sel.options[i].value===currentName){
+        sel.selectedIndex=i;pickDevice(sel);matched=true;break;
+      }
+    }
+    if(!matched)cdn.style.display='block';
+  }
 }
 
 fetch('/cast-devices').then(function(r){return r.json();}).then(function(data){
@@ -254,6 +267,15 @@ function scanDevices(){
     },1500);
   }).catch(function(){btn.disabled=false;st.textContent='';});
 }
+
+document.getElementById('sf').addEventListener('submit',function(e){
+  var sel=document.getElementById('cdp');
+  var cdn=document.getElementById('cdn');
+  if(sel.style.display!=='none'&&sel.value&&sel.value!=='__other__'){
+    cdn.value=sel.value;
+  }
+  if(!cdn.value.trim()){e.preventDefault();cdn.style.display='block';cdn.focus();}
+});
 
 document.querySelectorAll('.st').forEach(function(el){
   var v=parseInt(el.querySelector('input').value);

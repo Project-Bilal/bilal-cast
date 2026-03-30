@@ -44,7 +44,7 @@ def main():
 
     if bumped:
         with open(MANIFEST, "w") as f:
-            json.dump(manifest, f, indent=2)
+            json.dump(manifest, f, indent=2)  # type: ignore[call-arg]
         print("OTA versions bumped:")
         for b in bumped:
             print(" ", b)
