@@ -59,12 +59,56 @@ def _has_app():
         return False
 
 
+def _rmtree(path):
+    try:
+        mode = os.stat(path)[0]
+    except Exception:
+        return
+    if mode & 0x4000:  # directory
+        try:
+            for entry in os.listdir(path):
+                _rmtree(path + "/" + entry)
+        except Exception:
+            pass
+        try:
+            os.rmdir(path)
+        except Exception:
+            pass
+    else:
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+
+
+def _wipe_fs_app():
+    """Remove the filesystem app so the next boot uses the frozen onboarding
+    portal and then re-provisions over OTA. Used only to recover a device
+    whose stale filesystem bilalcast package shadows the frozen portal."""
+    for p in ("bilalcast", "www", "ota_version.txt", "ota_file_versions.json"):
+        _rmtree(p)
+
+
 _c = _cfg()
 
 if _c is None:
     import asyncio  # pyright: ignore[reportMissingImports]
-    from bilalcast.captive_portal import captive_portal
-    asyncio.run(captive_portal())
+    try:
+        from bilalcast.captive_portal import captive_portal
+        asyncio.run(captive_portal())
+    except Exception as e:
+        # captive_portal is frozen, but a stale filesystem bilalcast package
+        # (OTA'd before captive_portal joined the manifest) shadows it, so the
+        # import fails and onboarding is impossible. Self-heal: wipe the
+        # filesystem app so the next boot uses the frozen portal, then OTA
+        # re-provisions a complete app that includes captive_portal.
+        import sys
+        import utime as time  # pyright: ignore[reportMissingImports]
+        sys.print_exception(e)
+        _wipe_fs_app()
+        _led_error()
+        time.sleep(3)
+        machine.reset()
 
 elif _has_app():
     try:

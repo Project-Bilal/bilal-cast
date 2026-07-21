@@ -201,11 +201,11 @@ def start_status_server(
     @app.route("/icon.png", methods=["GET"])
     @app.route("/favicon.ico", methods=["GET"])
     def icon_route(request):
-        from bilalcast.icon_data import (  # pyright: ignore[reportMissingImports]
-            DATA,
-        )
-
-        return DATA, 200, "image/png"
+        # Serve from the filesystem (www/icon.png is in the OTA manifest).
+        # Do NOT import the frozen bilalcast.icon_data here: once the app is
+        # on the filesystem it shadows the frozen bilalcast package, so that
+        # import raises and (having no guard) would kill the request task.
+        return app.serve_file("www/icon.png")
 
     @app.route("/settings", methods=["GET"])
     def settings_page(request):

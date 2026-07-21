@@ -5,6 +5,11 @@
     "version": 1
   },
   {
+    "remote": "bilalcast/captive_portal.py",
+    "local": "bilalcast/captive_portal.py",
+    "version": 2
+  },
+  {
     "remote": "bilalcast/cast.py",
     "local": "bilalcast/cast.py",
     "version": 1
@@ -107,6 +112,11 @@
   {
     "remote": "bilalcast/status.py",
     "local": "bilalcast/status.py",
+    "version": 2
+  },
+  {
+    "remote": "bilalcast/www/icon.png",
+    "local": "www/icon.png",
     "version": 1
   },
   {
