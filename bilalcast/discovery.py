@@ -56,65 +56,78 @@ def start_mdns_responder(local_ip, device_ip):
     _persistent_client.enable_responder("bilalcast.local", device_ip)
 
 
-async def _mdns_find(local_ip, name):
+async def _scan_cast_services(local_ip, passes=6, timeout=3, want=None):
+    """Multi-pass _googlecast scan that merges partial records across passes.
+
+    A single mDNS query usually resolves only a subset of the services on the
+    network: each service needs SRV (port) + A (ip) + TXT (friendly name),
+    and those records often arrive across different passes. Cast groups are
+    frequently the ones missing from any given pass, which made single-pass
+    lookups fail to find them. Keying by the stable per-service instance name
+    and merging host/port/fn across passes makes discovery reliable for
+    groups and individual devices alike.
+
+    Returns {instance_name: {"host": ip|None, "port": int|None, "fn": str|None}}.
+    If ``want`` (a friendly name) is given, returns early as soon as that
+    entry is fully resolved.
+    """
     from bilalcast.mdns_client import Client
     from bilalcast.mdns_client.service_discovery.txt_discovery import TXTServiceDiscovery
     client = _persistent_client if _persistent_client is not None else Client(local_ip)
     discovery = TXTServiceDiscovery(client)
-    for attempt in range(10):
+    want = want.lower() if want else None
+    acc = {}
+    for _ in range(passes):
         try:
-            results = await discovery.query_once("_googlecast", "_tcp", timeout=3)
-            for d in results or ():
-                try:
-                    fn = d.txt_records.get("fn") or []
-                    found_name = fn[0].strip() if fn else ""
-                except Exception:
-                    found_name = ""
-                if found_name.lower() == name.lower():
-                    host = None
-                    for ip in (d.ips or []):
-                        if "." in ip:
-                            host = ip
-                            break
-                    port = int(d.port) if d.port is not None else None
-                    if host and port:
-                        return host, port
+            results = await discovery.query_once("_googlecast", "_tcp", timeout=timeout)
         except Exception as e:
-            log("mDNS attempt {} failed: {}".format(attempt + 1, e))
-        await asyncio.sleep_ms(300)
+            log("cast scan error: " + str(e))
+            results = ()
+        for d in results or ():
+            entry = acc.setdefault(d.name, {"host": None, "port": None, "fn": None})
+            if entry["port"] is None and d.port:
+                entry["port"] = int(d.port)
+            if entry["host"] is None:
+                for ip in (d.ips or []):
+                    if "." in ip:
+                        entry["host"] = ip
+                        break
+            if entry["fn"] is None:
+                try:
+                    fn = (d.txt_records or {}).get("fn") or []
+                    if fn:
+                        entry["fn"] = fn[0].strip()
+                except Exception:
+                    pass
+        if want is not None:
+            for entry in acc.values():
+                if entry["fn"] and entry["fn"].lower() == want and entry["host"] and entry["port"]:
+                    return acc
+        await asyncio.sleep_ms(200)
+    return acc
+
+
+async def _mdns_find(local_ip, name):
+    target = name.lower()
+    acc = await _scan_cast_services(local_ip, passes=10, timeout=3, want=name)
+    for entry in acc.values():
+        if entry["fn"] and entry["fn"].lower() == target and entry["host"] and entry["port"]:
+            return entry["host"], entry["port"]
     log("mDNS scan failed finding device...")
     return None, None
 
 
 async def list_cast_devices(local_ip, scans=5):
-    """Multi-pass mDNS scan. Returns deduplicated list of {name, host, port} across all scans."""
-    from bilalcast.mdns_client import Client
-    from bilalcast.mdns_client.service_discovery.txt_discovery import TXTServiceDiscovery
-    client = _persistent_client if _persistent_client is not None else Client(local_ip)
-    discovery = TXTServiceDiscovery(client)
-    seen_names = []
+    """Multi-pass mDNS scan. Returns deduplicated list of {name, host, port}."""
+    acc = await _scan_cast_services(local_ip, passes=scans, timeout=3)
     devices = []
-    for _ in range(scans):
-        try:
-            results = await discovery.query_once("_googlecast", "_tcp", timeout=3)
-            for d in results or ():
-                try:
-                    fn = d.txt_records.get("fn") or []
-                    name = fn[0].strip() if fn else ""
-                except Exception:
-                    name = ""
-                if not name or name in seen_names:
-                    continue
-                seen_names.append(name)
-                host = None
-                for ip in (d.ips or []):
-                    if "." in ip:
-                        host = ip
-                        break
-                port = int(d.port) if d.port is not None else None
-                devices.append({"name": name, "host": host, "port": port})
-        except Exception as e:
-            log("cast device scan error: " + str(e))
+    seen = []
+    for entry in acc.values():
+        name = entry["fn"]
+        if not name or name in seen:
+            continue
+        seen.append(name)
+        devices.append({"name": name, "host": entry["host"], "port": entry["port"]})
     return devices
 
 

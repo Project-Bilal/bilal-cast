@@ -17,7 +17,7 @@
   {
     "remote": "bilalcast/discovery.py",
     "local": "bilalcast/discovery.py",
-    "version": 1
+    "version": 2
   },
   {
     "remote": "bilalcast/logger.py",
