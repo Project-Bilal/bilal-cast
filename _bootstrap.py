@@ -3,7 +3,7 @@ import os
 import machine  # pyright: ignore[reportMissingImports]
 
 _led = machine.Pin("LED", machine.Pin.OUT)
-_led_timer = machine.Timer()
+_led_timer = machine.Timer(-1)
 
 
 def _led_slow_blink():

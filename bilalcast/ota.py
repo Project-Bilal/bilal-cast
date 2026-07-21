@@ -2,6 +2,15 @@ import urequests  # pyright: ignore[reportMissingImports]
 import ujson as json  # pyright: ignore[reportMissingImports]
 import os
 
+# ota runs in two contexts: the normal app flow (logger present) and the
+# first-boot bootstrap, where logger.py has not been downloaded yet. Fall back
+# to print() so logging never breaks the initial install.
+try:
+    from bilalcast.logger import log
+except Exception:  # pragma: no cover - bootstrap path only
+    def log(msg, level="INFO"):
+        print(msg)
+
 OTA_OWNER  = "Project-Bilal"
 OTA_REPO   = "bilal-cast"
 OTA_BRANCH = "main"
@@ -27,7 +36,7 @@ def _remote_version():
         finally:
             r.close()
     except Exception as e:
-        print("OTA version check failed:", e)
+        log("OTA version check failed: " + str(e), "WARN")
         return None
 
 
@@ -52,10 +61,10 @@ def _download(url, local_path):
                     f.write(r.content)
             finally:
                 r.close()
-            print("OTA:", local_path)
+            log("OTA: " + local_path)
             return True
         except Exception as e:
-            print("OTA retry", attempt + 1, local_path, e)
+            log("OTA retry {} {}: {}".format(attempt + 1, local_path, e), "WARN")
             if attempt < 2:
                 import utime
                 utime.sleep(2)
@@ -71,7 +80,7 @@ def _fetch_manifest():
             finally:
                 r.close()
         except Exception as e:
-            print("OTA manifest retry", attempt + 1, e)
+            log("OTA manifest retry {}: {}".format(attempt + 1, e), "WARN")
             if attempt < 2:
                 import utime
                 utime.sleep(2)
@@ -91,14 +100,14 @@ def _save_file_versions(versions):
         with open(_FILE_VERS, "w") as f:
             f.write(json.dumps(versions))
     except Exception as e:
-        print("OTA: file versions save failed:", e)
+        log("OTA: file versions save failed: " + str(e), "ERROR")
 
 
 def download_all():
     """Download all app files (first-boot install). Returns True if all succeeded."""
     manifest = _fetch_manifest()
     if manifest is None:
-        print("OTA: could not fetch manifest")
+        log("OTA: could not fetch manifest", "ERROR")
         return False
     return download_changed(manifest)
 
@@ -131,17 +140,17 @@ def check_and_update():
     remote_v = _remote_version()
     if remote_v is None or local_v == remote_v:
         return False
-    print("OTA: updating", local_v, "->", remote_v)
+    log("OTA: updating {} -> {}".format(local_v, remote_v))
     manifest = _fetch_manifest()
     if manifest is None:
-        print("OTA: could not fetch manifest")
+        log("OTA: could not fetch manifest", "ERROR")
         return False
     if download_changed(manifest):
         try:
             with open(_VER_FILE, "w") as f:
                 f.write(remote_v)
         except Exception as e:
-            print("OTA: version write failed:", e)
+            log("OTA: version write failed: " + str(e), "ERROR")
         return True
-    print("OTA: some downloads failed, not marking updated")
+    log("OTA: some downloads failed, not marking updated", "ERROR")
     return False

@@ -196,39 +196,3 @@ def try_prayers_by_address(address, method=2, timezone="", lat_adj=1, midnight=0
     except Exception as e:
         log("try_prayers_by_address failed: " + str(e))
     return None
-
-
-def get_next_prayer(lat, lon, method=2, timezone=""):
-    while True:
-        try:
-            ct = time.localtime()
-            now_mins = ct[3] * 60 + ct[4]
-            date = "{:02d}-{:02d}-{:04d}".format(ct[2], ct[1], ct[0])
-            d = _fetch_timings(date, lat, lon, method, timezone)
-            if d.get("code") == 200:
-                timings = d["data"]["timings"]
-                for prayer in ATHANS_ORDER:
-                    t = timings.get(prayer, "")[:5]
-                    if not t:
-                        continue
-                    h, m = t.split(":")
-                    if int(h) * 60 + int(m) > now_mins:
-                        log("next prayer: {} {}".format(prayer, t))
-                        return prayer, t
-                # All today's prayers have passed — fetch tomorrow's first
-                tomorrow = time.localtime(time.mktime(ct) + 86400)
-                date2 = "{:02d}-{:02d}-{:04d}".format(tomorrow[2], tomorrow[1], tomorrow[0])
-                d2 = _fetch_timings(date2, lat, lon, method, timezone)
-                if d2.get("code") == 200:
-                    timings2 = d2["data"]["timings"]
-                    for prayer in ATHANS_ORDER:
-                        t = timings2.get(prayer, "")[:5]
-                        if t:
-                            log("next prayer (tomorrow): {} {}".format(prayer, t))
-                            return prayer, t
-                log("No known prayer found, retrying...")
-            else:
-                log("Timings fetch failed (code {}), retrying...".format(d.get("code")))
-        except Exception as e:
-            log("Next prayer fetch failed, retrying: " + str(e))
-        time.sleep(2)

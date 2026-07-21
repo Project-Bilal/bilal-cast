@@ -154,9 +154,12 @@ async def _parse_headers(reader):
     headers = {}
     while True:
         header_line = await reader.readline()
-        if header_line == b"\r\n":  # crlf denotes body start
+        if not header_line or header_line == b"\r\n":  # EOF or blank line ends headers
             break
-        name, value = header_line.decode().strip().split(": ", 1)
+        line = header_line.decode().strip()
+        if ": " not in line:
+            continue  # tolerate malformed header lines instead of killing the task
+        name, value = line.split(": ", 1)
         headers[name.lower()] = value
     return headers
 

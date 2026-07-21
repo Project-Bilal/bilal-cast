@@ -20,7 +20,7 @@ from bilalcast.prayer import (
     ATHANS_ORDER,
     PRE_ATHAN,
 )
-from bilalcast.discovery import resolve_cast_device, cast_url, start_mdns_responder, list_cast_devices
+from bilalcast.discovery import resolve_cast_device, cast_url, start_mdns_responder
 from bilalcast.status import start_status_server
 
 # USER CONFIGURED DATA
@@ -189,7 +189,9 @@ def connect_to_wifi_with_retries(
     machine.reset()
 
 
-def set_rtc(max_attempts=20):
+async def set_rtc(max_attempts=20):
+    # Async so the retry backoff yields to the event loop (status server,
+    # mDNS responder) instead of freezing it when NTP is slow/unreachable.
     for host_idx in range(max_attempts):
         ntptime.host = _NTP_HOSTS[host_idx % len(_NTP_HOSTS)]
         try:
@@ -200,7 +202,7 @@ def set_rtc(max_attempts=20):
                     ntptime.host, str(e)
                 )
             )
-            time.sleep(2)
+            await asyncio.sleep(2)
             continue
 
         year = time.localtime()[0]
@@ -209,7 +211,7 @@ def set_rtc(max_attempts=20):
             return
 
         log("RTC year implausible ({}), trying next host...".format(year))
-        time.sleep(2)
+        await asyncio.sleep(2)
 
     log("NTP failed after {} attempts; resetting.".format(max_attempts))
     time.sleep(1)
@@ -339,7 +341,7 @@ async def run_schedule():
         state["next_prayer"] = None
         state["next_prayer_time"] = None
         await asyncio.sleep(max(60, seconds_until("00:01")))
-        set_rtc()
+        await set_rtc()
         global _tz_string
         geo_lat, geo_lon, offset, tz_string = get_location()
         _tz_string = tz_string
@@ -427,7 +429,7 @@ async def main():
 
     geo_lat, geo_lon, utc_offset, tz_string = get_location()
     _tz_string = tz_string
-    set_rtc()
+    await set_rtc()
     if utc_offset:
         adjust_rtc(utc_offset)
 

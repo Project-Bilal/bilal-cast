@@ -33,11 +33,14 @@ def send_ntfy(msg, priority=3, tags=None):
 def log(msg, level=INFO):
     if _debug:
         print("[{}] {}".format(level, msg))
-    else:
-        if level in (WARN, ERROR):
-            send_ntfy("[{}] {}".format(level, msg))
-        else:
-            send_ntfy(msg)
+    elif level == ERROR:
+        send_ntfy("[ERROR] " + msg, priority=5, tags=["rotating_light"])
+    elif level == WARN:
+        send_ntfy("[WARN] " + msg, priority=4, tags=["warning"])
+    # INFO in production is intentionally dropped: the device is headless (no
+    # console) and routing every INFO line to ntfy floods the topic and risks
+    # rate-limiting the notifications that matter. Milestone notifications
+    # (boot "online", cast results) call send_ntfy() directly.
 
 
 def warn(msg):
