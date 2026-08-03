@@ -180,7 +180,7 @@ ad.addEventListener('input',function(){
         li.addEventListener('click',function(){
           ad.value=item.display_name;
           lv.value=item.lat;ov.value=item.lon;
-          sg.style.display='none';upd();
+          sg.style.display='none';upd();updClear();runPreview();
         });
         sg.appendChild(li);
       });
@@ -298,25 +298,31 @@ function sv(btn,d){
   el.querySelector('.sv').textContent=v===0?'Off':v+'%';
 }
 
-pb.addEventListener('click',function(){
-  var a=ad.value.trim();
-  if(!a){pv.innerHTML='<p class=hint>Enter an address first.</p>';return;}
+function buildPreviewUrl(){
   var m=document.querySelector('select[name=method]').value;
   var la=document.querySelector('select[name=lat_adj]').value;
   var mi=document.querySelector('select[name=midnight]').value;
   var sc=document.querySelector('select[name=school]').value;
   var extra='&latitudeAdjustmentMethod='+la+'&midnightMode='+mi+'&school='+sc;
   var now=new Date(),ds=now.getDate()+'-'+(now.getMonth()+1)+'-'+now.getFullYear();
-  var url;
-  if(lv.value&&ov.value){
-    url='https://api.aladhan.com/v1/timings/'+ds+'?latitude='+lv.value+'&longitude='+ov.value+'&method='+m+extra;
-  }else{
-    url='https://api.aladhan.com/v1/timingsByAddress/'+ds+'?address='+encodeURIComponent(a)+'&method='+m+extra;
-  }
+  if(lv.value&&ov.value)
+    return 'https://api.aladhan.com/v1/timings/'+ds+'?latitude='+lv.value+'&longitude='+ov.value+'&method='+m+extra;
+  var a=ad.value.trim();
+  if(a)
+    return 'https://api.aladhan.com/v1/timingsByAddress/'+ds+'?address='+encodeURIComponent(a)+'&method='+m+extra;
+  return null;
+}
+
+var pvSeq=0;
+function runPreview(){
+  var url=buildPreviewUrl();
+  if(!url){pv.innerHTML='';return;}
+  var seq=++pvSeq;
   pv.innerHTML='<p class=hint>Loading\u2026</p>';
   fetch(url)
   .then(function(r){return r.json();})
   .then(function(data){
+    if(seq!==pvSeq)return;  // a newer change superseded this request
     if(data.code!==200){pv.innerHTML='<p class=hint style="color:#d93025">Could not fetch prayer times.</p>';return;}
     var t=data.data.timings;
     var rows=['Fajr','Dhuhr','Asr','Maghrib','Isha'].map(function(p){
@@ -324,8 +330,33 @@ pb.addEventListener('click',function(){
     }).join('');
     pv.innerHTML='<table>'+rows+'</table>';
   })
-  .catch(function(){pv.innerHTML='<p class=hint style="color:#d93025">Network error.</p>';});
+  .catch(function(){if(seq===pvSeq)pv.innerHTML='<p class=hint style="color:#d93025">Network error.</p>';});
+}
+
+var pvTimer;
+function queuePreview(delay){
+  clearTimeout(pvTimer);
+  pvTimer=setTimeout(runPreview,delay==null?250:delay);
+}
+
+// Manual button: refresh now, or nudge if no location is set yet
+pb.addEventListener('click',function(){
+  if(!buildPreviewUrl()){pv.innerHTML='<p class=hint>Enter an address first.</p>';return;}
+  runPreview();
 });
+
+// Re-fetch the preview whenever a calculation setting changes
+['method','lat_adj','midnight','school'].forEach(function(n){
+  var el=document.querySelector('select[name='+n+']');
+  if(el)el.addEventListener('change',function(){queuePreview(150);});
+});
+
+// Re-fetch when the address text is changed and committed (blur); picking a
+// suggestion refreshes immediately via the autocomplete handler above
+ad.addEventListener('change',function(){queuePreview(150);});
+
+// Show the preview on load if a location is already configured
+queuePreview(150);
 </script>
 </body>
 </html>
