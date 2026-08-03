@@ -19,12 +19,13 @@ def send_ntfy(msg, priority=3, tags=None):
     payload = {"topic": "bilalpico", "title": _device_name, "message": msg, "priority": priority}
     if tags:
         payload["tags"] = tags
+    data = json.dumps(payload)
+    headers = {"Content-Type": "application/json"}
     try:
-        resp = urequests.post(
-            "https://ntfy.sh/",
-            data=json.dumps(payload),
-            headers={"Content-Type": "application/json"},
-        )
+        try:
+            resp = urequests.post("https://ntfy.sh/", data=data, headers=headers, timeout=5)
+        except TypeError:  # older urequests without a timeout kwarg
+            resp = urequests.post("https://ntfy.sh/", data=data, headers=headers)
         resp.close()
     except Exception as e:
         print("ntfy failed:", e)

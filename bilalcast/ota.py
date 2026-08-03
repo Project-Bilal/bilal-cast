@@ -11,6 +11,16 @@ except Exception:  # pragma: no cover - bootstrap path only
     def log(msg, level="INFO"):
         print(msg)
 
+_HTTP_TIMEOUT = 15  # seconds; a stalled mirror shouldn't hang the OTA/boot
+
+
+def _get(url):
+    """urequests.get with a socket timeout, degrading gracefully if unsupported."""
+    try:
+        return urequests.get(url, timeout=_HTTP_TIMEOUT)
+    except TypeError:
+        return urequests.get(url)
+
 OTA_OWNER  = "Project-Bilal"
 OTA_REPO   = "bilal-cast"
 OTA_BRANCH = "main"
@@ -30,7 +40,7 @@ def _local_version():
 
 def _remote_version():
     try:
-        r = urequests.get(_RAW + "/version.txt")
+        r = _get(_RAW + "/version.txt")
         try:
             return r.text.strip()
         finally:
@@ -55,7 +65,7 @@ def _download(url, local_path):
     _makedirs(local_path)
     for attempt in range(3):
         try:
-            r = urequests.get(url)
+            r = _get(url)
             try:
                 with open(local_path, "wb") as f:
                     f.write(r.content)
@@ -74,7 +84,7 @@ def _download(url, local_path):
 def _fetch_manifest():
     for attempt in range(3):
         try:
-            r = urequests.get(_RAW + "/manifest.json")
+            r = _get(_RAW + "/manifest.json")
             try:
                 return json.loads(r.text)
             finally:

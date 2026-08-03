@@ -22,12 +22,12 @@
   {
     "remote": "bilalcast/logger.py",
     "local": "bilalcast/logger.py",
-    "version": 2
+    "version": 3
   },
   {
     "remote": "bilalcast/main.py",
     "local": "bilalcast/main.py",
-    "version": 4
+    "version": 5
   },
   {
     "remote": "bilalcast/mdns_client/__init__.py",
@@ -82,7 +82,7 @@
   {
     "remote": "bilalcast/ota.py",
     "local": "bilalcast/ota.py",
-    "version": 4
+    "version": 5
   },
   {
     "remote": "bilalcast/phew/__init__.py",
@@ -107,7 +107,7 @@
   {
     "remote": "bilalcast/prayer.py",
     "local": "bilalcast/prayer.py",
-    "version": 2
+    "version": 3
   },
   {
     "remote": "bilalcast/status.py",

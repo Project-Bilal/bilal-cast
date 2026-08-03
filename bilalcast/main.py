@@ -192,6 +192,10 @@ def connect_to_wifi_with_retries(
 async def set_rtc(max_attempts=20):
     # Async so the retry backoff yields to the event loop (status server,
     # mDNS responder) instead of freezing it when NTP is slow/unreachable.
+    try:
+        ntptime.timeout = 3  # default is 1s, which is tight over WiFi
+    except Exception:
+        pass
     for host_idx in range(max_attempts):
         ntptime.host = _NTP_HOSTS[host_idx % len(_NTP_HOSTS)]
         try:
