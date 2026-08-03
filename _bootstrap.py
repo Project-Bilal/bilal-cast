@@ -126,7 +126,7 @@ else:
     import network  # pyright: ignore[reportMissingImports]
     import utime as time  # pyright: ignore[reportMissingImports]
 
-    _title = _c.get("cast_device_name", "Bilal Cast")
+    _title = _c.get("ssid", "Bilal Cast")  # SSID as ntfy title — unique per network
 
     print("OTA boot: connecting to WiFi...")
     _led_slow_blink()  # slow blink = WiFi connecting

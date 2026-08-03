@@ -400,7 +400,7 @@ async def main():
         PRAYER_VOLUMES[_p] = int(config.get(_k, "50")) / 100.0
 
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD, hostname=DEVICE_HOSTNAME)
-    logger.configure(DEBUG, CAST_DEVICE_NAME)
+    logger.configure(DEBUG, SSID)  # SSID as ntfy title — unique per network
 
     # Populate state and start HTTP server immediately after WiFi so the
     # status page is reachable as soon as possible. Remaining boot steps
