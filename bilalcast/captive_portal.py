@@ -124,14 +124,8 @@ async def captive_portal():
 
     @app.route("/icon.png", methods=["GET"])
     def ap_icon(request):
-        # Fresh device: this module runs frozen and can reach the frozen
-        # icon_data. Reset device: it runs from the filesystem (which shadows
-        # the frozen bilalcast package), so fall back to the OTA'd www/icon.png.
-        try:
-            from bilalcast.icon_data import DATA  # pyright: ignore[reportMissingImports]
-            return DATA, 200, "image/png"
-        except Exception:
-            pass
+        # Served from the OTA'd www/icon.png. 404s harmlessly during a
+        # brand-new device's first onboarding (before OTA), which is cosmetic.
         try:
             return app.serve_file("www/icon.png")
         except Exception:

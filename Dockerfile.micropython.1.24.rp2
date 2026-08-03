@@ -49,10 +49,6 @@ ADD bilalcast/phew              modules/bilalcast/phew
 ADD bilalcast/captive_portal.py modules/bilalcast/captive_portal.py
 ADD bilalcast/ota.py            modules/bilalcast/ota.py
 
-# --- Bake icon.png into firmware as a frozen bytes module ---
-ADD bilalcast/www/icon.png /tmp/icon.png
-RUN python3 -c "d=open('/tmp/icon.png','rb').read(); open('modules/bilalcast/icon_data.py','w').write('DATA='+repr(d)+'\n')"
-
 # --- Frozen bootstrap entry point ---
 ADD _bootstrap.py modules/main.py
 
