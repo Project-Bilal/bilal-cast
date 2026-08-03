@@ -315,10 +315,12 @@ async def run_schedule():
             if not t or _time_passed(t):
                 continue
 
+            vol = PRAYER_VOLUMES.get(prayer, 0.5)
+            if vol <= 0:
+                continue  # volume "Off" for this prayer — skip pre-athan and athan
+
             state["next_prayer"] = prayer
             state["next_prayer_time"] = t
-
-            vol = PRAYER_VOLUMES.get(prayer, 0.5)
 
             if PRE_ATHAN_MINS > 0:
                 pre_t = pre_athan_time(t, PRE_ATHAN_MINS)

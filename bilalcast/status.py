@@ -195,7 +195,8 @@ def start_status_server(
 
     @app.route("/test", methods=["POST"])
     def test_cast_route(request):
-        asyncio.create_task(do_cast(activation_url, "test"))
+        # volume=None: play at the speaker's current volume without changing it
+        asyncio.create_task(do_cast(activation_url, "test", None))
         return "ok", 200
 
     @app.route("/icon.png", methods=["GET"])

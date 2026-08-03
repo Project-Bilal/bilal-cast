@@ -12,12 +12,12 @@
   {
     "remote": "bilalcast/cast.py",
     "local": "bilalcast/cast.py",
-    "version": 1
+    "version": 2
   },
   {
     "remote": "bilalcast/discovery.py",
     "local": "bilalcast/discovery.py",
-    "version": 2
+    "version": 3
   },
   {
     "remote": "bilalcast/logger.py",
@@ -27,7 +27,7 @@
   {
     "remote": "bilalcast/main.py",
     "local": "bilalcast/main.py",
-    "version": 2
+    "version": 3
   },
   {
     "remote": "bilalcast/mdns_client/__init__.py",
@@ -112,7 +112,7 @@
   {
     "remote": "bilalcast/status.py",
     "local": "bilalcast/status.py",
-    "version": 2
+    "version": 3
   },
   {
     "remote": "bilalcast/www/icon.png",

@@ -121,7 +121,7 @@ class Chromecast(object):
             v = ("%.2f" % volume).rstrip("0").rstrip(".")
         else:
             v = str(volume)
-        payload = b'{"type":"SET_VOLUME","volume":{"level":' + v.encode() + b'},"requestId":2}'
+        payload = b'{"type":"SET_VOLUME","volume":{"level":' + v.encode() + b'},"requestId":5}'
         self._send(_frame(_NS_RECV, payload, dest=_RECV))
 
     def play_url(self, url):
