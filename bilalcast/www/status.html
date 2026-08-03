@@ -35,10 +35,10 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 </div>
 <div id=ptr></div>
 <div class=hd>
-<h1>Bilal Cast</h1>
+<span style="display:flex;align-items:center;gap:8px"><img src=/icon.png alt="" style="width:30px;height:30px;border-radius:6px;flex:none"><h1>Bilal Cast</h1></span>
 <span style="display:flex;align-items:center;gap:4px">{{rssi_svg + ""}}<button class=rb onclick="this.classList.add('spinning');location.reload()" title=Refresh>&#8635;</button></span>
 </div>
-<div class=c>{{local_time}}</div>
+<div class=c>{{local_time}}{{address_line + ""}}</div>
 <div class=c>Cast Device: {{device_name}} {{cast_status + ""}}<br>
 Last Call Made: {{lc + ""}}</div>
 <div class=c><table>{{rows + ""}}</table></div>

@@ -88,11 +88,20 @@ def render_status(state):
             ota_version = _f.read().strip()
     except Exception:
         ota_version = "unknown"
+    addr = state.get("address") or ""
+    if not addr and state.get("lat") is not None and state.get("lon") is not None:
+        addr = "{}, {}".format(state["lat"], state["lon"])
+    if addr:
+        addr = addr.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        address_line = '<br><span style="font-size:.85rem;color:#5f6368">\U0001F4CD ' + addr + "</span>"
+    else:
+        address_line = ""
     return render_template(
         "www/status.html",
         device_name=state["device_name"] or "Bilal Cast",
         cast_status=cast_status,
         local_time=local_time,
+        address_line=address_line,
         local_ip=state["local_ip"] or "?",
         rssi_svg=_rssi_svg(rssi),
         rows=rows,
