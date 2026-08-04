@@ -247,6 +247,12 @@ function fillDeviceList(devices){
   var sel=document.getElementById('cdp');
   var cdn=document.getElementById('cdn');
   var currentName=cdn.value;
+  // Always offer the currently-configured device, even if this scan missed it
+  // (cast-group discovery is flaky \u2014 the device may not appear every scan).
+  var names=devices.map(function(d){return d.name||d;});
+  if(currentName && names.indexOf(currentName)===-1){
+    devices=devices.concat([{name:currentName}]);
+  }
   sel.innerHTML='<option value="" disabled selected>Select a device\u2026</option>';
   devices.forEach(function(d){
     var o=document.createElement('option');
@@ -273,6 +279,7 @@ function fillDeviceList(devices){
   }
 }
 
+fillDeviceList([]);  // show the configured device right away, before the scan finishes
 scanDevices();
 
 function scanDevices(){

@@ -117,8 +117,12 @@ async def _mdns_find(local_ip, name):
     return None, None
 
 
-async def list_cast_devices(local_ip, scans=5):
-    """Multi-pass mDNS scan. Returns deduplicated list of {name, host, port}."""
+async def list_cast_devices(local_ip, scans=8):
+    """Multi-pass mDNS scan. Returns deduplicated list of {name, host, port}.
+
+    Cast groups often don't answer every pass, so use plenty of passes (the
+    merge in _scan_cast_services keeps whatever each pass resolves).
+    """
     acc = await _scan_cast_services(local_ip, passes=scans, timeout=3)
     devices = []
     seen = []
