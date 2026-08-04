@@ -122,7 +122,7 @@
   {
     "remote": "bilalcast/www/settings.html",
     "local": "www/settings.html",
-    "version": 8
+    "version": 9
   },
   {
     "remote": "bilalcast/www/status.html",
