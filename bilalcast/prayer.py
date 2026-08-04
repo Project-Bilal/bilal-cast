@@ -3,17 +3,36 @@ import urequests
 
 from bilalcast.logger import log
 
-FAJR_ATHAN = "https://storage.googleapis.com/athans/athan_fajr_1.mp3"
-ATHAN = "https://storage.googleapis.com/athans/athan_1.mp3"
-PRE_ATHAN = "https://storage.googleapis.com/athans/Salat_Ibrahimiyya.mp3"
-ATHANS = {
-    "Fajr": FAJR_ATHAN,
-    "Dhuhr": ATHAN,
-    "Asr": ATHAN,
-    "Maghrib": ATHAN,
-    "Isha": ATHAN,
-}
 ATHANS_ORDER = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
+
+# Athan audio lives in a public bucket; a sound is identified by its filename.
+# These defaults are the sounds the project has always shipped with.
+ATHAN_BASE = "https://storage.googleapis.com/athans/"
+DEFAULT_ATHAN = "athan_1.mp3"          # Dhuhr / Asr / Maghrib / Isha
+DEFAULT_FAJR = "athan_fajr_1.mp3"      # Fajr
+DEFAULT_PRE_ATHAN = "Salat_Ibrahimiyya.mp3"  # reminder before prayer
+
+
+def athan_url(filename):
+    """Full storage URL for a sound file, percent-encoding the path (so names
+    with spaces or non-ASCII characters work)."""
+    out = ""
+    for c in filename:
+        cp = ord(c)
+        if cp < 128 and (c.isalpha() or c.isdigit() or c in "-_.~"):
+            out += c
+        elif cp < 128:
+            out += "%{:02X}".format(cp)  # space -> %20, etc.
+        else:
+            for b in c.encode("utf-8"):
+                out += "%{:02X}".format(b)
+    return ATHAN_BASE + out
+
+
+def build_athans(athan=DEFAULT_ATHAN, fajr=DEFAULT_FAJR):
+    """{prayer: url} for the selected athan sounds (Fajr gets its own)."""
+    a = athan_url(athan)
+    return {"Fajr": athan_url(fajr), "Dhuhr": a, "Asr": a, "Maghrib": a, "Isha": a}
 
 _HTTP_TIMEOUT = 15  # seconds; keeps a stalled server from hanging the device forever
 

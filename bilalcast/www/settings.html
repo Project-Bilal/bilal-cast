@@ -39,6 +39,10 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 .st button{width:30px;height:30px;border-radius:50%;border:1px solid #ddd;background:#f4f6f9;color:#333;font-size:1.1rem;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
 .st button:active{background:#e0e0e0}
 .sv{font-size:.9rem;color:#333;width:36px;text-align:center}
+.sr{display:flex;gap:6px;align-items:center;margin-bottom:2px}
+.sr select{flex:1}
+.pl{flex:none;width:42px;padding:9px 0;border:none;border-radius:4px;background:#5f6368;color:#fff;cursor:pointer;font-size:.85rem}
+.pl.playing{background:#1a73e8}
 </style>
 </head>
 <body>
@@ -75,6 +79,18 @@ button{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;margin:4px 
 <button type=button class=bg id=scb onclick="scanDevices()">Scan for Devices</button>
 </div>
 <p id=scs class=hint></p>
+</div>
+
+<div class=c>
+<b>Athan Sounds</b>
+<p class=hint>Choose the call-to-prayer audio. Tap &#9654; to preview it in your browser.</p>
+<label>Athan (Dhuhr, Asr, Maghrib, Isha)</label>
+<div class=sr><select name=athan id=snd_athan></select><button type=button class=pl onclick="playSnd('snd_athan')">&#9654;</button></div>
+<label>Fajr Athan</label>
+<div class=sr><select name=fajr_athan id=snd_fajr></select><button type=button class=pl onclick="playSnd('snd_fajr')">&#9654;</button></div>
+<label>Reminder before prayer</label>
+<div class=sr><select name=pre_athan id=snd_pre></select><button type=button class=pl onclick="playSnd('snd_pre')">&#9654;</button></div>
+<p id=snd_status class=hint></p>
 </div>
 
 <div class=c>
@@ -357,6 +373,47 @@ ad.addEventListener('change',function(){queuePreview(150);});
 
 // Show the preview on load if a location is already configured
 queuePreview(150);
+
+// ---- Athan sound selection ----
+var SND_BASE='https://storage.googleapis.com/athans/';
+var CUR_SND={athan:"{{athan_current}}",fajr:"{{fajr_current}}",pre:"{{pre_current}}"};
+var _sndAudio=null,_sndBtn=null;
+function playSnd(selId){
+  var sel=document.getElementById(selId);
+  if(!sel||!sel.value)return;
+  var btn=document.querySelector('.pl[onclick*="'+selId+'"]');
+  if(_sndAudio){_sndAudio.pause();if(_sndBtn)_sndBtn.classList.remove('playing');}
+  if(_sndBtn===btn){_sndAudio=null;_sndBtn=null;return;}  // second tap = stop
+  _sndAudio=new Audio(SND_BASE+encodeURIComponent(sel.value));
+  _sndBtn=btn; if(btn)btn.classList.add('playing');
+  _sndAudio.onended=function(){if(btn)btn.classList.remove('playing');};
+  _sndAudio.play().catch(function(){if(btn)btn.classList.remove('playing');});
+}
+function _fillSnd(selId,groups,order,current){
+  var el=document.getElementById(selId); el.innerHTML='';
+  order.forEach(function(t){
+    (groups[t]||[]).forEach(function(m){
+      var o=document.createElement('option');
+      o.value=m.value; o.textContent=m.desc||m.label||m.value;
+      if(m.value===current)o.selected=true;
+      el.appendChild(o);
+    });
+  });
+}
+fetch('https://us-central1-project-bilal-338505.cloudfunctions.net/get-athans')
+.then(function(r){return r.json();})
+.then(function(data){
+  var groups={};
+  Object.keys(data).forEach(function(fn){
+    var m=data[fn],t=(m.type||'').toLowerCase();
+    (groups[t]=groups[t]||[]).push(m);
+  });
+  Object.keys(groups).forEach(function(t){groups[t].sort(function(a,b){return (a.desc||'').localeCompare(b.desc||'');});});
+  _fillSnd('snd_athan',groups,['athan','mix','takbir'],CUR_SND.athan);
+  _fillSnd('snd_fajr',groups,['fajr','athan','mix','takbir'],CUR_SND.fajr);
+  _fillSnd('snd_pre',groups,['notification'],CUR_SND.pre);
+})
+.catch(function(){document.getElementById('snd_status').textContent='Could not load the sound list (no internet?). Your current sounds are kept.';});
 </script>
 </body>
 </html>

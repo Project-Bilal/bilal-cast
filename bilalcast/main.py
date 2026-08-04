@@ -16,9 +16,12 @@ from bilalcast.prayer import (
     geocode_address,
     pre_athan_time,
     seconds_until,
-    ATHANS,
+    athan_url,
+    build_athans,
+    DEFAULT_ATHAN,
+    DEFAULT_FAJR,
+    DEFAULT_PRE_ATHAN,
     ATHANS_ORDER,
-    PRE_ATHAN,
 )
 from bilalcast.discovery import resolve_cast_device, cast_url, start_mdns_responder
 from bilalcast.status import start_status_server
@@ -42,6 +45,11 @@ LAT_ADJ_METHOD = 1
 MIDNIGHT_MODE = 0
 SCHOOL = 0
 PRAYER_VOLUMES = {"Fajr": 0.5, "Dhuhr": 0.5, "Asr": 0.5, "Maghrib": 0.5, "Isha": 0.5}
+ATHAN_SOUND = DEFAULT_ATHAN
+FAJR_SOUND = DEFAULT_FAJR
+PRE_ATHAN_SOUND = DEFAULT_PRE_ATHAN
+ATHANS = build_athans()                  # {prayer: url}, rebuilt from config in main()
+PRE_ATHAN = athan_url(DEFAULT_PRE_ATHAN)  # reminder URL, rebuilt from config in main()
 _cfg_lat = None
 _cfg_lon = None
 _cfg_address = None
@@ -65,6 +73,9 @@ state = {
     "lat_adj": 1,
     "midnight": 0,
     "school": 0,
+    "athan": DEFAULT_ATHAN,
+    "fajr_athan": DEFAULT_FAJR,
+    "pre_athan": DEFAULT_PRE_ATHAN,
     "cast_devices": [],
     "local_ip": None,
     "boot_epoch": 0,
@@ -362,7 +373,7 @@ async def run_schedule():
 
 
 async def main():
-    global SSID, PASSWORD, CAST_DEVICE_NAME, PRE_ATHAN_MINS, CALC_METHOD, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL, PRAYER_VOLUMES, _cfg_lat, _cfg_lon, _cfg_address, _tz_string
+    global SSID, PASSWORD, CAST_DEVICE_NAME, PRE_ATHAN_MINS, CALC_METHOD, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL, PRAYER_VOLUMES, ATHAN_SOUND, FAJR_SOUND, PRE_ATHAN_SOUND, ATHANS, PRE_ATHAN, _cfg_lat, _cfg_lon, _cfg_address, _tz_string
 
     logger.configure(True, None)  # always print before WiFi is up
     led_blink()
@@ -402,6 +413,11 @@ async def main():
     for _p in ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]:
         _k = "vol_" + _p.lower()
         PRAYER_VOLUMES[_p] = int(config.get(_k, "50")) / 100.0
+    ATHAN_SOUND = config.get("athan") or DEFAULT_ATHAN
+    FAJR_SOUND = config.get("fajr_athan") or DEFAULT_FAJR
+    PRE_ATHAN_SOUND = config.get("pre_athan") or DEFAULT_PRE_ATHAN
+    ATHANS = build_athans(ATHAN_SOUND, FAJR_SOUND)
+    PRE_ATHAN = athan_url(PRE_ATHAN_SOUND)
 
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD, hostname=DEVICE_HOSTNAME)
     logger.configure(DEBUG, SSID)  # SSID as ntfy title — unique per network
@@ -487,6 +503,9 @@ async def main():
     state["lat_adj"] = LAT_ADJ_METHOD
     state["midnight"] = MIDNIGHT_MODE
     state["school"] = SCHOOL
+    state["athan"] = ATHAN_SOUND
+    state["fajr_athan"] = FAJR_SOUND
+    state["pre_athan"] = PRE_ATHAN_SOUND
 
     # Fetch prayer times: try address endpoint first if no lat/lon, then geo fallback
     if lat is None and lon is None and _cfg_address:

@@ -125,6 +125,9 @@ def render_settings(state, pre_athan_mins, calc_method, prayer_volumes):
         lat_adj=str(state.get("lat_adj", 1)),
         midnight=str(state.get("midnight", 0)),
         school=str(state.get("school", 0)),
+        athan_current=str(state.get("athan") or ""),
+        fajr_current=str(state.get("fajr_athan") or ""),
+        pre_current=str(state.get("pre_athan") or ""),
         cast_device_name=state["device_name"] or "",
         local_ip=state["local_ip"] or "",
         vol_fajr=vols["Fajr"],
@@ -143,6 +146,13 @@ def save_settings(form, config_file):
     cfg["lat_adj"] = form.get("lat_adj", "1").strip()
     cfg["midnight"] = form.get("midnight", "0").strip()
     cfg["school"] = form.get("school", "0").strip()
+    # athan sound selections (fall back to current value if the form omitted them)
+    for _snd, _dflt in (("athan", "athan_1.mp3"), ("fajr_athan", "athan_fajr_1.mp3"), ("pre_athan", "Salat_Ibrahimiyya.mp3")):
+        _v = form.get(_snd, "").strip()
+        if _v:
+            cfg[_snd] = _v
+        elif _snd not in cfg:
+            cfg[_snd] = _dflt
     for _p in ["fajr", "dhuhr", "asr", "maghrib", "isha"]:
         _k = "vol_" + _p
         try:
