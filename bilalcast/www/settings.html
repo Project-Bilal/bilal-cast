@@ -410,7 +410,7 @@ fetch('https://us-central1-project-bilal-338505.cloudfunctions.net/get-athans')
   });
   Object.keys(groups).forEach(function(t){groups[t].sort(function(a,b){return (a.desc||'').localeCompare(b.desc||'');});});
   _fillSnd('snd_athan',groups,['athan','mix','takbir'],CUR_SND.athan);
-  _fillSnd('snd_fajr',groups,['fajr','athan','mix','takbir'],CUR_SND.fajr);
+  _fillSnd('snd_fajr',groups,['fajr'],CUR_SND.fajr);
   _fillSnd('snd_pre',groups,['notification'],CUR_SND.pre);
 })
 .catch(function(){document.getElementById('snd_status').textContent='Could not load the sound list (no internet?). Your current sounds are kept.';});
