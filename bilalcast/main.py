@@ -10,8 +10,10 @@ import bilalcast.logger as logger
 from bilalcast.logger import log, warn, error, send_ntfy
 from bilalcast.prayer import (
     get_location,
+    try_location,
     get_all_prayers,
     get_all_prayers_by_address,
+    try_prayers,
     try_prayers_by_address,
     geocode_address,
     pre_athan_time,
@@ -33,6 +35,8 @@ ACTIVATION_URL = "https://translate.google.com/translate_tts?client=tw-ob&tl=en&
 
 CONFIG_FILE = "config.json"
 CAST_STATE_FILE = "cast_state.json"
+PRAYER_CACHE_FILE = "prayer_times.json"    # last good prayer times (offline backup)
+LOCATION_CACHE_FILE = "location.json"      # last good lat/lon/offset/tz (offline backup)
 
 # Runtime config — populated from CONFIG_FILE at boot
 SSID = None
@@ -269,6 +273,63 @@ def _get_prayer_times(lat, lon, method, tz):
     return {}
 
 
+def _load_json_file(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _save_json_file(path, obj):
+    try:
+        with open(path, "w") as f:
+            json.dump(obj, f)
+            f.flush()
+        os.sync()  # commit to flash so a reboot after a prayer keeps the backup
+    except Exception as e:
+        warn("save {} failed: {}".format(path, str(e)))
+
+
+def _today_str():
+    t = time.localtime()
+    return "{:04d}-{:02d}-{:02d}".format(t[0], t[1], t[2])
+
+
+def _save_prayer_cache(times):
+    _save_json_file(PRAYER_CACHE_FILE, {"date": _today_str(), "times": times})
+
+
+def _load_prayer_cache():
+    """Return (times, date_str) from the last good fetch, or (None, None)."""
+    d = _load_json_file(PRAYER_CACHE_FILE)
+    if d and d.get("times"):
+        return d["times"], d.get("date")
+    return None, None
+
+
+def _resolve_location(attempts=5):
+    """IP geolocation with a persisted fallback so a transient ip-api.com outage
+    can't hang the boot. Returns (lat, lon, utc_offset, tz)."""
+    for _i in range(attempts):
+        r = try_location()
+        if r:
+            _save_json_file(
+                LOCATION_CACHE_FILE,
+                {"lat": r[0], "lon": r[1], "offset": r[2], "tz": r[3]},
+            )
+            log("location: {}, {} (UTC offset {}s, tz {})".format(r[0], r[1], r[2], r[3]))
+            return r
+        time.sleep(2)
+    cached = _load_json_file(LOCATION_CACHE_FILE)
+    if cached and cached.get("tz") is not None:
+        warn("IP geolocation unavailable — using cached location/timezone")
+        return cached.get("lat"), cached.get("lon"), cached.get("offset", 0), cached.get("tz", "")
+    # First boot during an outage and no cache: last resort, block until it responds.
+    warn("IP geolocation unavailable and no cache — retrying until it responds")
+    return get_location()
+
+
 async def _discovery_loop():
     """Background task: retry cast device discovery every 30s until found."""
     while True:
@@ -453,7 +514,7 @@ async def main():
 
     if check_factory_reset():
         log("Factory reset confirmed, clearing config...")
-        for f in (CONFIG_FILE, "cast_device.json", CAST_STATE_FILE):
+        for f in (CONFIG_FILE, "cast_device.json", CAST_STATE_FILE, PRAYER_CACHE_FILE, LOCATION_CACHE_FILE):
             try:
                 os.remove(f)
             except Exception:
@@ -537,7 +598,7 @@ async def main():
     except Exception as e:
         warn("OTA check failed: " + str(e))
 
-    geo_lat, geo_lon, utc_offset, tz_string = get_location()
+    geo_lat, geo_lon, utc_offset, tz_string = _resolve_location()
     _tz_string = tz_string
     await set_rtc()
     if utc_offset:
@@ -621,20 +682,52 @@ async def main():
     state["fajr_athan"] = FAJR_SOUND
     state["pre_athan"] = PRE_ATHAN_SOUND
 
-    # Fetch prayer times: try address endpoint first if no lat/lon, then geo fallback
-    if lat is None and lon is None and _cfg_address:
-        times = try_prayers_by_address(_cfg_address, CALC_METHOD, _tz_string, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL)
-        if times is None:
-            log("address prayer times failed, falling back to IP geolocation")
-            lat = geo_lat
-            lon = geo_lon
-            state["lat"] = lat
-            state["lon"] = lon
-            state["prayer_times"] = get_all_prayers(lat, lon, CALC_METHOD, _tz_string)
-        else:
-            state["prayer_times"] = times
+    # Fetch prayer times with a persisted offline backup so an Aladhan/network
+    # outage can't leave the device silent. Strategy:
+    #   - Try the API a bounded number of times (prefer lat/lon, else address,
+    #     else IP-geolocated coords). Bounded so it never blocks the event loop
+    #     forever the way the old retry-forever path did.
+    #   - On success: cache {date, times} to flash.
+    #   - On failure: reuse the last cached day. Prayer times drift only ~1 min
+    #     per day, so a recent cached day is a safe backup for a good while.
+    #   - Only if we've NEVER cached (first boot during an outage) do we fall
+    #     back to a blocking retry, since a device with no schedule is useless.
+    def _fetch_once(_lat, _lon):
+        if _lat is not None and _lon is not None:
+            return try_prayers(_lat, _lon, CALC_METHOD, _tz_string, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL)
+        if _cfg_address:
+            return try_prayers_by_address(_cfg_address, CALC_METHOD, _tz_string, LAT_ADJ_METHOD, MIDNIGHT_MODE, SCHOOL)
+        return None
+
+    times = None
+    for _i in range(5):
+        times = _fetch_once(lat, lon)
+        if not times and (lat is None or lon is None) and geo_lat is not None:
+            # address / no-coords attempt failed — try IP-geolocated coordinates
+            times = _fetch_once(geo_lat, geo_lon)
+            if times:
+                lat, lon = geo_lat, geo_lon
+                state["lat"], state["lon"] = lat, lon
+        if times:
+            break
+        time.sleep(2)
+
+    if times:
+        _save_prayer_cache(times)
     else:
-        state["prayer_times"] = _get_prayer_times(lat, lon, CALC_METHOD, _tz_string)
+        cached, cached_date = _load_prayer_cache()
+        if cached:
+            warn("prayer API unavailable — using cached prayer times from {}".format(cached_date))
+            send_ntfy("prayer API down — using cached times ({})".format(cached_date), priority=4, tags=["warning"])
+            times = cached
+        else:
+            warn("prayer API unavailable and no cache — retrying until it responds")
+            _flat = lat if lat is not None else geo_lat
+            _flon = lon if lon is not None else geo_lon
+            times = _get_prayer_times(_flat, _flon, CALC_METHOD, _tz_string)
+            if times:
+                _save_prayer_cache(times)
+    state["prayer_times"] = times or {}
 
     led_solid()
     log("ready — visit http://bilalcast.local")

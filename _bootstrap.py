@@ -44,7 +44,10 @@ def _cfg():
     try:
         with open("config.json") as f:
             c = json.load(f)
-        if c.get("ssid") and c.get("password") and c.get("cast_device_name"):
+        # Only Wi-Fi is required — onboarding collects SSID (+ optional password
+        # for open networks); the cast device is chosen later in Settings. This
+        # must match main.load_config() or a Wi-Fi-only device never boots.
+        if c.get("ssid"):
             return c
     except Exception:
         pass
@@ -137,7 +140,7 @@ else:
         network.hostname(_c.get("hostname", "bilalcast"))
     except Exception:
         pass
-    wlan.connect(_c["ssid"], _c["password"])
+    wlan.connect(_c["ssid"], _c.get("password", ""))
     for _ in range(30):
         if wlan.isconnected():
             break

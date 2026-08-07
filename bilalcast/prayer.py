@@ -86,6 +86,24 @@ def get_location():
         time.sleep(2)
 
 
+def try_location():
+    """Single IP-geolocation attempt. Returns (lat, lon, offset, tz) or None.
+
+    Bounded variant of get_location() so callers can add a persisted fallback
+    instead of blocking forever when ip-api.com is down."""
+    try:
+        resp = _get("http://ip-api.com/json?fields=status,lat,lon,offset,timezone")
+        try:
+            d = resp.json()
+        finally:
+            resp.close()
+        if d.get("status") == "success":
+            return d["lat"], d["lon"], d.get("offset", 0), d.get("timezone", "")
+    except Exception as e:
+        log("IP geolocation attempt failed: " + str(e))
+    return None
+
+
 def _url_encode(s):
     """Percent-encode a string for use in a URL query parameter."""
     result = ""
@@ -217,4 +235,17 @@ def try_prayers_by_address(address, method=2, timezone="", lat_adj=1, midnight=0
         return _extract_timings(d)
     except Exception as e:
         log("try_prayers_by_address failed: " + str(e))
+    return None
+
+
+def try_prayers(lat, lon, method=2, timezone="", lat_adj=1, midnight=0, school=0):
+    """Single lat/lon attempt, returns dict or None (no retry).
+
+    Bounded variant of get_all_prayers() so callers can add a persisted fallback
+    instead of blocking forever when the Aladhan API is down."""
+    try:
+        d = _fetch_timings(_today(time.localtime()), lat, lon, method, timezone, lat_adj, midnight, school)
+        return _extract_timings(d)
+    except Exception as e:
+        log("try_prayers failed: " + str(e))
     return None
