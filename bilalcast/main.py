@@ -359,14 +359,13 @@ async def run_schedule():
 
         # A network/reachability blip at prayer time shouldn't drop the athan.
         # cast_url already retries ~3x over ~10s; if that whole window is inside
-        # the blip we keep retrying for a few minutes, re-resolving the cast
-        # endpoint each time (in case a cached group port went stale). A few
-        # minutes late beats a missed prayer.
+        # the blip, keep retrying for up to ~3 minutes past the trigger,
+        # re-resolving the endpoint each time (in case a cached group port went
+        # stale). A couple minutes late beats a missed prayer.
+        cast_started = time.time()
         ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
-        attempts = 0
-        while not ok and attempts < 6:
-            await asyncio.sleep(30)
-            attempts += 1
+        while not ok and (time.time() - cast_started) < 180:
+            await asyncio.sleep(15)
             state["cast_host"] = None  # force re-resolve (re-validate cache / rediscover)
             ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
 
