@@ -37,6 +37,8 @@ CONFIG_FILE = "config.json"
 CAST_STATE_FILE = "cast_state.json"
 PRAYER_CACHE_FILE = "prayer_times.json"    # last good prayer times (offline backup)
 LOCATION_CACHE_FILE = "location.json"      # last good lat/lon/offset/tz (offline backup)
+WIFI_FAIL_FILE = "wifi_fail.txt"           # consecutive failed-boot counter
+_WIFI_FAIL_THRESHOLD = 3                    # open onboarding after this many failed boots
 
 # Runtime config — populated from CONFIG_FILE at boot
 SSID = None
@@ -184,6 +186,17 @@ def connect_to_wifi_with_retries(
                     log("  status: " + statuses.get(status, str(status)))
                     last_status = status
 
+                # Fail this attempt fast on a terminal status (wrong password,
+                # AP not found) instead of waiting out the full timeout — keeps
+                # the reboot/onboarding fallback from taking many minutes.
+                if status in (
+                    network.STAT_WRONG_PASSWORD,
+                    network.STAT_NO_AP_FOUND,
+                    network.STAT_CONNECT_FAIL,
+                ):
+                    log("  connect failed: " + statuses.get(status, str(status)))
+                    break
+
                 if time.time() - start >= timeout_seconds:
                     log("  timed out after {}s".format(timeout_seconds))
                     break
@@ -201,9 +214,10 @@ def connect_to_wifi_with_retries(
 
         time.sleep(retry_delay_s)
 
-    log("Wi-Fi failed after {} attempts; resetting.".format(max_retries))
-    time.sleep(1)
-    machine.reset()
+    # Signal failure to the caller instead of resetting here, so boot can fall
+    # back to onboarding after repeated failures rather than reboot-looping.
+    log("Wi-Fi failed after {} attempts.".format(max_retries))
+    return None
 
 
 async def set_rtc(max_attempts=20):
@@ -234,7 +248,10 @@ async def set_rtc(max_attempts=20):
         log("RTC year implausible ({}), trying next host...".format(year))
         await asyncio.sleep(2)
 
-    log("NTP failed after {} attempts; resetting.".format(max_attempts))
+    log("NTP failed after {} attempts; trying HTTP Date fallback...".format(max_attempts))
+    if _set_rtc_via_http():
+        return
+    log("HTTP time fallback failed too; resetting.")
     time.sleep(1)
     machine.reset()
 
@@ -245,11 +262,100 @@ def adjust_rtc(utc_offset_secs):
     log("RTC adjusted to local time (UTC offset {}s)".format(utc_offset_secs))
 
 
+def _wifi_fail_count():
+    try:
+        with open(WIFI_FAIL_FILE) as f:
+            return int(f.read().strip() or "0")
+    except Exception:
+        return 0
+
+
+def _set_wifi_fail_count(n):
+    try:
+        if n <= 0:
+            os.remove(WIFI_FAIL_FILE)
+        else:
+            with open(WIFI_FAIL_FILE, "w") as f:
+                f.write(str(n))
+                f.flush()
+            os.sync()
+    except Exception:
+        pass
+
+
+_MONTHS = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+}
+
+
+def _parse_http_date(line):
+    """Parse an HTTP 'Date:' header line into (year, mon, day, hh, mm, ss) UTC."""
+    try:
+        # "Date: Wed, 21 Oct 2015 07:28:00 GMT" -> "Wed, 21 Oct 2015 07:28:00 GMT"
+        v = line.split(":", 1)[1].strip()
+        p = v.split(" ")  # ["Wed,","21","Oct","2015","07:28:00","GMT"]
+        day = int(p[1])
+        mon = _MONTHS[p[2]]
+        year = int(p[3])
+        hh, mm, ss = [int(x) for x in p[4].split(":")]
+        return year, mon, day, hh, mm, ss
+    except Exception:
+        return None
+
+
+def _set_rtc_via_http():
+    """Fallback clock: set the RTC (UTC) from an HTTP Date header. Works when a
+    network blocks NTP (UDP/123) but allows HTTP. Returns True on success."""
+    import socket
+
+    for host in ("www.google.com", "cloudflare.com", "example.com"):
+        s = None
+        buf = b""
+        try:
+            ai = socket.getaddrinfo(host, 80)[0][-1]
+            s = socket.socket()
+            s.settimeout(5)
+            s.connect(ai)
+            s.send(b"HEAD / HTTP/1.0\r\nHost: " + host.encode() + b"\r\nConnection: close\r\n\r\n")
+            while len(buf) < 2048:
+                chunk = s.recv(512)
+                if not chunk:
+                    break
+                buf += chunk
+                if b"\r\n\r\n" in buf:
+                    break
+        except Exception as e:
+            log("HTTP time fetch failed ({}): {}".format(host, e))
+        finally:
+            if s:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+        for line in buf.split(b"\r\n"):
+            if line[:5].lower() == b"date:":
+                parsed = _parse_http_date(line.decode())
+                if parsed and parsed[0] >= 2024:
+                    y, mo, d, hh, mm, ss = parsed
+                    epoch = time.mktime((y, mo, d, hh, mm, ss, 0, 0))
+                    tm = time.gmtime(epoch)
+                    machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
+                    log("RTC set via HTTP Date ({}): {}".format(host, str(time.localtime())))
+                    return True
+    return False
+
+
 def ensure_wifi():
     wlan = network.WLAN(network.STA_IF)
     if not wlan.isconnected():
         warn("WiFi dropped, reconnecting...")
-        connect_to_wifi_with_retries(SSID, PASSWORD)
+        if not connect_to_wifi_with_retries(SSID, PASSWORD):
+            # Mid-run reconnect failed — reboot so boot-time logic re-runs (and
+            # falls back to onboarding if the failure is persistent).
+            warn("WiFi reconnect failed; rebooting.")
+            time.sleep(1)
+            machine.reset()
 
 
 def _time_passed(hhmm):
@@ -514,7 +620,7 @@ async def main():
 
     if check_factory_reset():
         log("Factory reset confirmed, clearing config...")
-        for f in (CONFIG_FILE, "cast_device.json", CAST_STATE_FILE, PRAYER_CACHE_FILE, LOCATION_CACHE_FILE):
+        for f in (CONFIG_FILE, "cast_device.json", CAST_STATE_FILE, PRAYER_CACHE_FILE, LOCATION_CACHE_FILE, WIFI_FAIL_FILE):
             try:
                 os.remove(f)
             except Exception:
@@ -556,6 +662,24 @@ async def main():
     PRE_ATHAN = athan_url(PRE_ATHAN_SOUND)
 
     local_ip = connect_to_wifi_with_retries(SSID, PASSWORD, hostname=DEVICE_HOSTNAME)
+    if not local_ip:
+        # Wi-Fi didn't come up. A transient outage (router rebooting) should just
+        # retry, but a persistent failure (wrong password, renamed/removed SSID)
+        # must not reboot-loop forever. Count consecutive failed boots and, after
+        # a few, open onboarding so the user can fix the credentials in place.
+        fails = _wifi_fail_count() + 1
+        _set_wifi_fail_count(fails)
+        if fails >= _WIFI_FAIL_THRESHOLD:
+            log("Wi-Fi failed {} boots in a row — opening onboarding.".format(fails))
+            _set_wifi_fail_count(0)
+            from bilalcast.captive_portal import captive_portal as _portal
+
+            await _portal()
+            return  # never reached — portal resets after save
+        log("Wi-Fi failed (boot {}/{}); rebooting to retry.".format(fails, _WIFI_FAIL_THRESHOLD))
+        time.sleep(1)
+        machine.reset()
+    _set_wifi_fail_count(0)  # connected — clear the failed-boot counter
     logger.configure(DEBUG, SSID)  # SSID as ntfy title — unique per network
 
     # Populate state and start HTTP server immediately after WiFi so the

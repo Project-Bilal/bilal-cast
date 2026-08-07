@@ -279,7 +279,7 @@ def start_status_server(
 
     @app.route("/factory-reset", methods=["POST"])
     def factory_reset_route(request):
-        for f in (config_file, "cast_device.json", "cast_state.json", "prayer_times.json", "location.json"):
+        for f in (config_file, "cast_device.json", "cast_state.json", "prayer_times.json", "location.json", "wifi_fail.txt"):
             try:
                 os.remove(f)
             except Exception:

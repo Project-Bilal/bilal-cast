@@ -137,8 +137,19 @@ async def captive_portal():
     @app.route("/configure", methods=["POST"])
     def ap_configure(request):
         global _REBOOT_TIMER, _config_saved
+        # Merge the submitted Wi-Fi fields into any existing config so that
+        # re-onboarding (e.g. after a Wi-Fi password change) preserves the
+        # already-chosen cast device, location, sounds, etc. For a brand-new
+        # device there's no existing config and this is just the form.
+        try:
+            with open(CONFIG_FILE) as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = {}
+        for k in request.form:
+            cfg[k] = request.form[k]
         with open(CONFIG_FILE, "w") as f:
-            json.dump(request.form, f)
+            json.dump(cfg, f)
             f.flush()
         try:
             os.sync()
