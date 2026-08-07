@@ -366,8 +366,22 @@ async def run_schedule():
         ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
         while not ok and (time.time() - cast_started) < 180:
             await asyncio.sleep(15)
-            state["cast_host"] = None  # force re-resolve (re-validate cache / rediscover)
+            # Retry the SAME known endpoint — do NOT re-run mDNS here. A failure
+            # at prayer time is almost always a transient blip, which clears by
+            # trying the known-good host again; a flaky re-discovery would only
+            # trade a working endpoint for "not found" at the worst moment.
             ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
+        if not ok:
+            # A full 3-minute failure looks like a genuinely dead endpoint (e.g. a
+            # group port that actually moved), not a blip. Drop the mDNS cache so
+            # the reboot below rediscovers instead of retrying a dead host next
+            # time. A config pin is re-seeded on boot (the user's authoritative
+            # choice), so it is intentionally left untouched.
+            try:
+                os.remove("cast_device.json")
+                os.sync()
+            except Exception:
+                pass
 
         # Reboot for OTA + a fresh reschedule of the next prayer. The athan is
         # already playing on the speaker (LOAD confirmed), so this does not cut
@@ -480,25 +494,33 @@ async def main():
     if utc_offset:
         adjust_rtc(utc_offset)
 
-    # If a specific cast endpoint was saved in settings, seed the cache from it
-    # so the selection is honored even if the cache was cleared (durable choice).
+    # Cast endpoint. Prefer an endpoint we already know — an explicit pin from
+    # settings, else the mDNS cache from a previous boot — and TRUST it: no
+    # reachability probe, no mDNS, just use it. We reboot after every prayer, so
+    # any pre-cast probe runs before every cast; a momentary blip during that
+    # probe would otherwise blank a perfectly good endpoint and drop us into a
+    # flaky mDNS group scan. The cast itself (with its 3-min retry) is the real
+    # reachability test, and a full end-to-end failure clears the cache (see
+    # run_schedule) so the next reboot rediscovers. Discovery runs here only when
+    # we have no known endpoint at all.
+    from bilalcast.discovery import _load_cast_cache, _save_cast_cache
     _cfg_ch = config.get("cast_device_host")
     _cfg_cp = config.get("cast_device_port")
     if _cfg_ch and _cfg_cp:
-        try:
-            from bilalcast.discovery import _load_cast_cache, _save_cast_cache
-            if _load_cast_cache() == (None, None):
-                _save_cast_cache(_cfg_ch, int(_cfg_cp))
-                log("cast endpoint seeded from config: {}:{}".format(_cfg_ch, _cfg_cp))
-        except Exception as e:
-            warn("cast endpoint seed failed: " + str(e))
-
-    cast_host, cast_port = await resolve_cast_device(local_ip, CAST_DEVICE_NAME)
-    if cast_host:
-        log("cast device found: {}:{}".format(cast_host, cast_port))
+        cast_host, cast_port = _cfg_ch, int(_cfg_cp)
+        _save_cast_cache(cast_host, cast_port)  # keep the durable pin authoritative
+        log("using pinned cast endpoint: {}:{}".format(cast_host, cast_port))
     else:
-        warn("cast device not found at boot, background retry active")
-        asyncio.create_task(_discovery_loop())
+        cast_host, cast_port = _load_cast_cache()
+        if cast_host:
+            log("using cached cast endpoint: {}:{}".format(cast_host, cast_port))
+        else:
+            cast_host, cast_port = await resolve_cast_device(local_ip, CAST_DEVICE_NAME)
+            if cast_host:
+                log("cast device found: {}:{}".format(cast_host, cast_port))
+            else:
+                warn("cast device not found at boot, background retry active")
+                asyncio.create_task(_discovery_loop())
 
     state["cast_host"] = cast_host
     state["cast_port"] = cast_port
