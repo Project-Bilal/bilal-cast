@@ -292,6 +292,32 @@ def _save_cast_state(ok, label):
         error("cast state save failed: " + str(e))
 
 
+def _persist_cast_endpoint(host, port):
+    """Promote a working cast endpoint to the durable config pin.
+
+    Called after a successful cast: if the endpoint we just cast to differs from
+    what's pinned in config.json (e.g. it was rediscovered after a move, or the
+    device was only ever in the mDNS cache), write it so future boots use it
+    directly. No-op when it already matches, so it writes at most once per change.
+    """
+    if not host or not port:
+        return
+    try:
+        with open(CONFIG_FILE) as f:
+            cfg = json.load(f)
+        if cfg.get("cast_device_host") == host and str(cfg.get("cast_device_port")) == str(port):
+            return
+        cfg["cast_device_host"] = host
+        cfg["cast_device_port"] = str(port)
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(cfg, f)
+            f.flush()
+        os.sync()
+        log("pinned working cast endpoint to config: {}:{}".format(host, port))
+    except Exception as e:
+        warn("cast endpoint persist failed: " + str(e))
+
+
 async def do_cast(url, label, volume=0.5):
     ensure_wifi()
     if state["cast_host"] is None:
@@ -312,6 +338,7 @@ async def do_cast(url, label, volume=0.5):
     ok, cast_error = cast_url(url, state["cast_host"], state["cast_port"], volume=volume)
     _save_cast_state(ok, label)
     if ok:
+        _persist_cast_endpoint(state["cast_host"], state["cast_port"])
         send_ntfy(label, priority=3, tags=["bell"])
     else:
         error("cast failed: {} — {}".format(label, cast_error))
@@ -357,26 +384,35 @@ async def run_schedule():
         if secs_to_prayer > 0:
             await asyncio.sleep(secs_to_prayer)
 
-        # A network/reachability blip at prayer time shouldn't drop the athan.
-        # cast_url already retries ~3x over ~10s; if that whole window is inside
-        # the blip, keep retrying for up to ~3 minutes past the trigger,
-        # re-resolving the endpoint each time (in case a cached group port went
-        # stale). A couple minutes late beats a missed prayer.
+        # A network/reachability blip at prayer time shouldn't drop the athan, so
+        # keep retrying for up to ~3 minutes past the trigger (a couple minutes
+        # late beats a missed prayer). Strategy:
+        #   - Trust the known endpoint FIRST — most failures are transient blips
+        #     that clear by simply retrying the same host.
+        #   - After a few straight failures the endpoint may have genuinely moved
+        #     (a group's dynamic port can change), so periodically try one mDNS
+        #     rediscovery and adopt whatever it finds. Only adopt a real result —
+        #     a flaky empty scan must never blank the working host.
+        #   - On success, do_cast() persists the endpoint to config, so a moved
+        #     port becomes the new durable pin automatically.
         cast_started = time.time()
         ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
+        fails = 0
         while not ok and (time.time() - cast_started) < 180:
             await asyncio.sleep(15)
-            # Retry the SAME known endpoint — do NOT re-run mDNS here. A failure
-            # at prayer time is almost always a transient blip, which clears by
-            # trying the known-good host again; a flaky re-discovery would only
-            # trade a working endpoint for "not found" at the worst moment.
+            fails += 1
+            if fails == 3 or fails == 6:
+                nh, np = await resolve_cast_device(state["local_ip"], CAST_DEVICE_NAME)
+                if nh and (nh, np) != (state["cast_host"], state["cast_port"]):
+                    log("cast endpoint moved: {}:{} -> {}:{}".format(
+                        state["cast_host"], state["cast_port"], nh, np))
+                    state["cast_host"], state["cast_port"] = nh, np
             ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
         if not ok:
-            # A full 3-minute failure looks like a genuinely dead endpoint (e.g. a
-            # group port that actually moved), not a blip. Drop the mDNS cache so
-            # the reboot below rediscovers instead of retrying a dead host next
-            # time. A config pin is re-seeded on boot (the user's authoritative
-            # choice), so it is intentionally left untouched.
+            # Not even rediscovery could reach it in 3 minutes — drop the mDNS
+            # cache so the reboot below starts from a clean discovery. A config
+            # pin is re-seeded on boot (the user's authoritative choice) and left
+            # untouched.
             try:
                 os.remove("cast_device.json")
                 os.sync()
