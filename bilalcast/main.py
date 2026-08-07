@@ -455,6 +455,19 @@ async def main():
     if utc_offset:
         adjust_rtc(utc_offset)
 
+    # If a specific cast endpoint was saved in settings, seed the cache from it
+    # so the selection is honored even if the cache was cleared (durable choice).
+    _cfg_ch = config.get("cast_device_host")
+    _cfg_cp = config.get("cast_device_port")
+    if _cfg_ch and _cfg_cp:
+        try:
+            from bilalcast.discovery import _load_cast_cache, _save_cast_cache
+            if _load_cast_cache() == (None, None):
+                _save_cast_cache(_cfg_ch, int(_cfg_cp))
+                log("cast endpoint seeded from config: {}:{}".format(_cfg_ch, _cfg_cp))
+        except Exception as e:
+            warn("cast endpoint seed failed: " + str(e))
+
     cast_host, cast_port = await resolve_cast_device(local_ip, CAST_DEVICE_NAME)
     if cast_host:
         log("cast device found: {}:{}".format(cast_host, cast_port))

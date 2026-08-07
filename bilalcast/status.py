@@ -179,6 +179,8 @@ def save_settings(form, config_file):
         cfg.pop("address", None)
     old_name = cfg.get("cast_device_name", "")
     new_name = form.get("cast_device_name", "").strip()
+    cast_host = form.get("cast_device_host", "").strip()
+    cast_port_str = form.get("cast_device_port", "").strip()
     if new_name:
         cfg["cast_device_name"] = new_name
         if new_name != old_name:
@@ -186,21 +188,35 @@ def save_settings(form, config_file):
                 os.remove("cast_device.json")
             except Exception:
                 pass
-    cast_host = form.get("cast_device_host", "").strip()
-    cast_port_str = form.get("cast_device_port", "").strip()
+    # Persist the selected endpoint in config.json (durable/authoritative) and
+    # seed the runtime cache so it's used immediately and survives a cache clear.
     if cast_host and cast_port_str:
+        cfg["cast_device_host"] = cast_host
+        cfg["cast_device_port"] = cast_port_str
         try:
             from bilalcast.discovery import _save_cast_cache
             _save_cast_cache(cast_host, int(cast_port_str))
         except Exception:
             pass
+    elif new_name and new_name != old_name:
+        # switched to a device whose endpoint we don't know — drop the stale one
+        # so it is rediscovered via mDNS on next boot
+        cfg.pop("cast_device_host", None)
+        cfg.pop("cast_device_port", None)
     with open(config_file, "w") as f:
         json.dump(cfg, f)
+        f.flush()
+    try:
+        os.sync()  # commit to flash before rebooting — littlefs may otherwise
+                   # buffer the write and lose it on reset (onboarding does this too)
+    except Exception:
+        pass
     machine.Timer(-1).init(
-        period=1000,
+        period=2000,
         mode=machine.Timer.ONE_SHOT,
         callback=lambda t: machine.reset(),
     )
+    return "Saved — rebooting to apply…", 200
 
 
 def start_status_server(
@@ -268,8 +284,12 @@ def start_status_server(
                 os.remove(f)
             except Exception:
                 pass
+        try:
+            os.sync()  # commit the removals to flash before rebooting
+        except Exception:
+            pass
         machine.Timer(-1).init(
-            period=1000,
+            period=2000,
             mode=machine.Timer.ONE_SHOT,
             callback=lambda t: machine.reset(),
         )
