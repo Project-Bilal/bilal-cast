@@ -308,7 +308,7 @@ async def do_cast(url, label, volume=0.5):
                 tags=["warning"],
             )
             _save_cast_state(False, label)
-            return
+            return False
     ok, cast_error = cast_url(url, state["cast_host"], state["cast_port"], volume=volume)
     _save_cast_state(ok, label)
     if ok:
@@ -320,6 +320,7 @@ async def do_cast(url, label, volume=0.5):
             priority=5,
             tags=["warning"],
         )
+    return ok
 
 
 async def run_schedule():
@@ -356,7 +357,18 @@ async def run_schedule():
         if secs_to_prayer > 0:
             await asyncio.sleep(secs_to_prayer)
 
-        await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
+        # A network/reachability blip at prayer time shouldn't drop the athan.
+        # cast_url already retries ~3x over ~10s; if that whole window is inside
+        # the blip we keep retrying for a few minutes, re-resolving the cast
+        # endpoint each time (in case a cached group port went stale). A few
+        # minutes late beats a missed prayer.
+        ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
+        attempts = 0
+        while not ok and attempts < 6:
+            await asyncio.sleep(30)
+            attempts += 1
+            state["cast_host"] = None  # force re-resolve (re-validate cache / rediscover)
+            ok = await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
 
         # Reboot for OTA + a fresh reschedule of the next prayer. The athan is
         # already playing on the speaker (LOAD confirmed), so this does not cut
