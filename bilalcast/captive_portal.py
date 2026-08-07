@@ -44,9 +44,6 @@ _INDEX_HTML = (
     "<input type=text id=ssid name=ssid required style='display:{show_manual}'>"
     "<label for=password>Wi-Fi Password</label>"
     "<input type=text id=password name=password>"
-    "<label for=cast_device_name>Cast Device Name</label>"
-    "<input type=text id=cast_device_name name=cast_device_name"
-    " placeholder='Found in Google Home app under device settings' required>"
     "<button type=submit>Save &amp; Connect</button>"
     "</form></div>"
     "<script>"
@@ -164,7 +161,8 @@ async def captive_portal():
             "<div class=c><b class=ok>&#10003; Saved!</b><br>Connecting to <b>"
             + ssid +
             "</b>&hellip;</div>"
-            "<div class=c>Once connected, visit<br><b>http://bilalcast.local</b></div>"
+            "<div class=c>Once connected, open<br><b>http://bilalcast.local</b><br>"
+            "and choose your speaker under <b>Settings</b>.</div>"
             "</body></html>"
         ), 200
 

@@ -124,7 +124,9 @@ def load_config():
     try:
         with open(CONFIG_FILE) as f:
             d = json.load(f)
-        if d.get("ssid") and d.get("password") and d.get("cast_device_name"):
+        # Only Wi-Fi is required to complete onboarding; the cast device is
+        # chosen later on the Settings page. Password may be blank (open network).
+        if d.get("ssid"):
             return d
     except Exception:
         pass
@@ -321,6 +323,14 @@ def _persist_cast_endpoint(host, port):
 async def do_cast(url, label, volume=0.5):
     ensure_wifi()
     if state["cast_host"] is None:
+        if not CAST_DEVICE_NAME:
+            msg = "no cast device configured — pick one at http://{}.local/settings".format(
+                state.get("hostname") or "bilalcast"
+            )
+            warn(msg)
+            send_ntfy(msg, priority=4, tags=["warning"])
+            _save_cast_state(False, label)
+            return False
         log("Cast host unknown, attempting re-discovery...")
         host, port = await resolve_cast_device(state["local_ip"], CAST_DEVICE_NAME)
         if host:
@@ -462,8 +472,11 @@ async def main():
         return  # never reached — portal resets the device after save
 
     SSID = config["ssid"]
-    PASSWORD = config["password"]
-    CAST_DEVICE_NAME = config["cast_device_name"]
+    PASSWORD = config.get("password", "")
+    # Optional now: onboarding only collects Wi-Fi. The cast device is chosen on
+    # the Settings page, which writes cast_device_name (+ host/port). None here
+    # just means "no cast target yet" — the device still boots and serves status.
+    CAST_DEVICE_NAME = config.get("cast_device_name")
     PRE_ATHAN_MINS = int(config.get("pre_athan_mins", 10))
     CALC_METHOD = int(config.get("method", 2))
     LAT_ADJ_METHOD = int(config.get("lat_adj", 1))
@@ -550,6 +563,11 @@ async def main():
         cast_host, cast_port = _load_cast_cache()
         if cast_host:
             log("using cached cast endpoint: {}:{}".format(cast_host, cast_port))
+        elif not CAST_DEVICE_NAME:
+            # Wi-Fi-only onboarding, no device chosen yet. Boot normally and
+            # serve the status/settings page so the user can pick one.
+            cast_host, cast_port = None, None
+            log("no cast device configured yet — pick one at Settings")
         else:
             cast_host, cast_port = await resolve_cast_device(local_ip, CAST_DEVICE_NAME)
             if cast_host:

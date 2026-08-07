@@ -7,7 +7,7 @@
   {
     "remote": "bilalcast/captive_portal.py",
     "local": "bilalcast/captive_portal.py",
-    "version": 3
+    "version": 4
   },
   {
     "remote": "bilalcast/cast.py",
@@ -17,7 +17,7 @@
   {
     "remote": "bilalcast/discovery.py",
     "local": "bilalcast/discovery.py",
-    "version": 4
+    "version": 5
   },
   {
     "remote": "bilalcast/logger.py",
@@ -27,7 +27,7 @@
   {
     "remote": "bilalcast/main.py",
     "local": "bilalcast/main.py",
-    "version": 13
+    "version": 14
   },
   {
     "remote": "bilalcast/mdns_client/__init__.py",

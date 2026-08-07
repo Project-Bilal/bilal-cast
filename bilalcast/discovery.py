@@ -144,6 +144,12 @@ async def resolve_cast_device(local_ip, name):
             return host, port
         log("Cached device unreachable, scanning mDNS...")
 
+    if not name:
+        # No device configured yet (Wi-Fi-only onboarding). Can't do a by-name
+        # mDNS lookup; the user picks a device on the Settings page.
+        log("No cast device name configured; skipping mDNS lookup.")
+        return None, None
+
     log("Scanning mDNS for '{}'...".format(name))
     host, port = await _mdns_find(local_ip, name)
     if host and port:
