@@ -27,7 +27,7 @@
   {
     "remote": "bilalcast/main.py",
     "local": "bilalcast/main.py",
-    "version": 8
+    "version": 9
   },
   {
     "remote": "bilalcast/mdns_client/__init__.py",

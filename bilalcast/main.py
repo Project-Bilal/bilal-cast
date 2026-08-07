@@ -323,53 +323,54 @@ async def do_cast(url, label, volume=0.5):
 
 
 async def run_schedule():
-    while True:
-        times = state["prayer_times"]
-        for prayer in ATHANS_ORDER:
-            t = times.get(prayer)
-            if not t or _time_passed(t):
-                continue
+    # Handles the next not-yet-passed prayer, then reboots. Rebooting after
+    # every prayer means each prayer is scheduled by a freshly-booted device
+    # that re-syncs the clock, re-fetches prayer times, and runs the OTA check —
+    # so devices stay updated (the whole reason for the reset).
+    times = state["prayer_times"]
+    for prayer in ATHANS_ORDER:
+        t = times.get(prayer)
+        if not t or _time_passed(t):
+            continue
 
-            vol = PRAYER_VOLUMES.get(prayer, 0.5)
-            if vol <= 0:
-                continue  # volume "Off" for this prayer — skip pre-athan and athan
+        vol = PRAYER_VOLUMES.get(prayer, 0.5)
+        if vol <= 0:
+            continue  # volume "Off" for this prayer — skip pre-athan and athan
 
-            state["next_prayer"] = prayer
-            state["next_prayer_time"] = t
+        state["next_prayer"] = prayer
+        state["next_prayer_time"] = t
 
-            if PRE_ATHAN_MINS > 0:
-                pre_t = pre_athan_time(t, PRE_ATHAN_MINS)
-                if not _time_passed(pre_t):
-                    secs_to_pre = seconds_until(pre_t)
-                    if secs_to_pre > 0:
-                        await asyncio.sleep(secs_to_pre)
-                    asyncio.create_task(
-                        do_cast(PRE_ATHAN, "pre_{}, {}".format(prayer, pre_t), vol)
-                    )
+        if PRE_ATHAN_MINS > 0:
+            pre_t = pre_athan_time(t, PRE_ATHAN_MINS)
+            if not _time_passed(pre_t):
+                secs_to_pre = seconds_until(pre_t)
+                if secs_to_pre > 0:
+                    await asyncio.sleep(secs_to_pre)
+                # Fire-and-forget so it doesn't delay the athan sleep; the athan
+                # reboot below comes minutes later, after this has finished.
+                asyncio.create_task(
+                    do_cast(PRE_ATHAN, "pre_{}, {}".format(prayer, pre_t), vol)
+                )
 
-            secs_to_prayer = seconds_until(t)
-            if secs_to_prayer > 0:
-                await asyncio.sleep(secs_to_prayer)
+        secs_to_prayer = seconds_until(t)
+        if secs_to_prayer > 0:
+            await asyncio.sleep(secs_to_prayer)
 
-            await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
-            await asyncio.sleep(200)
+        await do_cast(ATHANS[prayer], "{}, {}".format(prayer, t), vol)
 
-        # All today's prayers done — wait for local midnight, re-sync, re-fetch
-        state["next_prayer"] = None
-        state["next_prayer_time"] = None
-        await asyncio.sleep(max(60, seconds_until("00:01")))
-        await set_rtc()
-        global _tz_string
-        geo_lat, geo_lon, offset, tz_string = get_location()
-        _tz_string = tz_string
-        if offset:
-            adjust_rtc(offset)
-        lat = float(_cfg_lat) if _cfg_lat else (None if _cfg_address else geo_lat)
-        lon = float(_cfg_lon) if _cfg_lon else (None if _cfg_address else geo_lon)
-        state["lat"] = lat
-        state["lon"] = lon
-        state["prayer_times"] = _get_prayer_times(lat, lon, CALC_METHOD, _tz_string)
-        log("Prayer times refreshed for new day")
+        # Reboot for OTA + a fresh reschedule of the next prayer. The athan is
+        # already playing on the speaker (LOAD confirmed), so this does not cut
+        # it off. _time_passed() uses <=, so the just-fired prayer is treated as
+        # passed on the next boot and won't double-fire.
+        await asyncio.sleep(5)
+        machine.reset()
+
+    # No prayers remain today — wait until just after midnight, then reboot to
+    # rebuild the new day (fresh clock/location/prayer-times) and OTA-check.
+    state["next_prayer"] = None
+    state["next_prayer_time"] = None
+    await asyncio.sleep(max(60, seconds_until("00:05")))
+    machine.reset()
 
 
 async def main():
