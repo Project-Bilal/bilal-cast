@@ -429,6 +429,19 @@ async def main():
     state["device_name"] = CAST_DEVICE_NAME
     state["hostname"] = DEVICE_HOSTNAME
     state["boot_epoch"] = time.time()
+    # Reflect the saved config in state right away so the settings page shows
+    # persisted values immediately after a reboot, not only once the (slow)
+    # location/discovery/prayer boot steps finish. lat/lon are re-affirmed with
+    # resolved coordinates further below.
+    state["address"] = _cfg_address or ""
+    state["lat"] = float(_cfg_lat) if _cfg_lat else None
+    state["lon"] = float(_cfg_lon) if _cfg_lon else None
+    state["lat_adj"] = LAT_ADJ_METHOD
+    state["midnight"] = MIDNIGHT_MODE
+    state["school"] = SCHOOL
+    state["athan"] = ATHAN_SOUND
+    state["fajr_athan"] = FAJR_SOUND
+    state["pre_athan"] = PRE_ATHAN_SOUND
     try:
         with open(CAST_STATE_FILE) as f:
             cs = json.load(f)
