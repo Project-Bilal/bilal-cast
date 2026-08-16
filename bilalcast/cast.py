@@ -147,21 +147,52 @@ class Chromecast(object):
         )
 
         self._send(_frame(_NS_MEDIA, load_payload, dest=transport_id))
-        return self._wait_for_load_confirmation(timeout_ms=10000)
+        confirmed = self._wait_for_load_confirmation(timeout_ms=10000)
+        if confirmed is not None:
+            return confirmed
+
+        # The LOAD may have reached the Chromecast even when its reply was lost.
+        # Ask the existing media session before allowing the caller to retry;
+        # blindly sending another LOAD can restart an athan that is already playing.
+        status_payload = b'{"type":"GET_STATUS","requestId":6}'
+        self._send(_frame(_NS_MEDIA, status_payload, dest=transport_id))
+        playing = self._wait_for_playback_state(timeout_ms=5000)
+        if playing is not None:
+            return playing
+
+        # An inconclusive status check is safer to treat as accepted. The LOAD was
+        # fully written, while retrying it risks duplicate playback.
+        return True
 
     def _wait_for_load_confirmation(self, timeout_ms=10000):
-        """Read messages until MEDIA_STATUS shows BUFFERING/PLAYING, or LOAD_FAILED."""
+        """Return True/False for a definite LOAD result, or None if uncertain."""
         start = self._ticks_ms()
         while self._ticks_diff(self._ticks_ms(), start) < timeout_ms:
             try:
                 msg = self.read_message()
             except OSError:
-                return False
+                return None
             if b"LOAD_FAILED" in msg:
                 return False
             if b'"BUFFERING"' in msg or b'"PLAYING"' in msg:
                 return True
-        return False
+        return None
+
+    def _wait_for_playback_state(self, timeout_ms=5000):
+        """Return True if active, False if definitely idle/failed, else None."""
+        start = self._ticks_ms()
+        while self._ticks_diff(self._ticks_ms(), start) < timeout_ms:
+            try:
+                msg = self.read_message()
+            except OSError:
+                return None
+            if b"LOAD_FAILED" in msg:
+                return False
+            if b'"BUFFERING"' in msg or b'"PLAYING"' in msg:
+                return True
+            if b'"playerState":"IDLE"' in msg:
+                return False
+        return None
 
     def _wait_for_transport_id(self, timeout_ms=4000):
         """Wait until any incoming message contains "transportId":"..."""
